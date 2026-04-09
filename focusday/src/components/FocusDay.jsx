@@ -197,7 +197,7 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,settings}){
   </div>);
 }
 
-function MonthView({year,month,today,selectedDate,onClickDate,onDoubleClickDate,tasks,completions}){
+function MonthView({year,month,today,selectedDate,onSelectDate,tasks,completions}){
   const dim=getDaysInMonth(year,month),fd=getFirstDayOfMonth(year,month),cells=[];
   for(let i=0;i<fd;i++)cells.push(null);for(let d=1;d<=dim;d++)cells.push(d);
   return(<div>
@@ -205,32 +205,37 @@ function MonthView({year,month,today,selectedDate,onClickDate,onDoubleClickDate,
     <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>{cells.map((day,i)=>{
       if(!day)return<div key={`e${i}`}/>;
       const ds=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),hT=dt.some(t=>t.category==='thing'),hI=dt.some(t=>t.category==='important'),hM=dt.some(t=>t.category==='maintenance'),ad=dt.length>0&&dt.every(t=>t.completed);
-      return<button key={ds} onClick={()=>onClickDate(ds)} onDoubleClick={()=>onDoubleClickDate(ds)} style={{aspect:'1',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:isS?`2px solid ${T.text}`:isT?`2px solid ${T.tm}`:`1px solid transparent`,borderRadius:T.rs,cursor:'pointer',background:isS?T.accentSoft:'transparent',fontFamily:F,transition:'all 0.15s'}}><span style={{fontSize:14,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{day}</span>{dt.length>0&&<div style={{display:'flex',gap:2}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}</button>;
+      return<button key={ds} onClick={()=>onSelectDate(ds)} style={{aspect:'1',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:isS?`2px solid ${T.text}`:isT?`2px solid ${T.tm}`:`1px solid transparent`,borderRadius:T.rs,cursor:'pointer',background:isS?T.accentSoft:'transparent',fontFamily:F,transition:'all 0.15s'}}><span style={{fontSize:14,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{day}</span>{dt.length>0&&<div style={{display:'flex',gap:2}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}</button>;
     })}</div>
   </div>);
 }
 
-function WeekView({weekStart,today,selectedDate,onClickDate,onDoubleClickDate,tasks,completions}){
+function WeekView({weekStart,today,selectedDate,onSelectDate,tasks,completions,onMoveTask}){
   const days=Array.from({length:7},(_,i)=>addDays(weekStart,i));
   const tr={display:'block',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'};
+  const [dragOver,setDragOver]=useState(null);
   return(<div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6}}>{days.map(d=>{
     const ds=fmt(d),isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),tt=dt.find(t=>t.category==='thing'),im=dt.filter(t=>t.category==='important'),ma=dt.filter(t=>t.category==='maintenance'),hT=!!tt,hI=im.length>0,hM=ma.length>0,ad=dt.length>0&&dt.every(t=>t.completed);
-    return<button key={ds} onClick={()=>onClickDate(ds)} onDoubleClick={()=>onDoubleClickDate(ds)} style={{padding:'12px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isS?`2px solid ${T.text}`:isT?`2px solid ${T.tm}`:`1px solid ${T.borderLight}`,background:isS?T.accentSoft:T.surface,fontFamily:F,minHeight:180,transition:'all 0.15s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
+    return<div key={ds} onClick={()=>onSelectDate(ds)}
+      onDragOver={e=>{e.preventDefault();setDragOver(ds);}}
+      onDragLeave={()=>setDragOver(null)}
+      onDrop={e=>{e.preventDefault();setDragOver(null);const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
+      style={{padding:'12px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isS?`2px solid ${T.text}`:dragOver===ds?`2px dashed ${T.imp}`:isT?`2px solid ${T.tm}`:`1px solid ${T.borderLight}`,background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,minHeight:180,transition:'all 0.15s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.04em'}}>{dayNames[d.getDay()]}</span><span style={{fontSize:16,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div>
       <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
-        {tt&&<div style={{fontSize:11,padding:'3px 6px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',...tr}}>{tt.title}</div>}
-        {im.slice(0,3).map(t=><div key={t.id} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',...tr}}>{t.title}</div>)}
-        {ma.slice(0,2).map(t=><div key={t.id} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',...tr}}>{t.title}</div>)}
+        {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:11,padding:'3px 6px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
+        {im.slice(0,3).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
+        {ma.slice(0,2).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
       </div>
       {dt.length>0&&<div style={{display:'flex',gap:3,paddingTop:6,justifyContent:'center'}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}
-    </button>;
+    </div>;
   })}</div>);
 }
 
 // ═══════════════════════════════════════════════════════════════════
 export default function FocusDay({supabase,user,onSignOut}){
   const [loaded,setLoaded]=useState(false),[tasks,setTasks]=useState([]),[comp,setComp]=useState({}),[settings,setSettings]=useState(DSET);
-  const [view,setView]=useState('month'),[today]=useState(new Date()),[selD,setSelD]=useState(fmt(new Date()));
+  const [rightView,setRightView]=useState('week'),[today]=useState(new Date()),[selD,setSelD]=useState(fmt(new Date()));
   const [cM,setCM]=useState(new Date().getMonth()),[cY,setCY]=useState(new Date().getFullYear()),[wS,setWS]=useState(startOfWeek(new Date()));
   const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false);
   const allProjects=useMemo(()=>[...new Set(tasks.map(t=>t.project).filter(Boolean))].sort(),[tasks]);
@@ -250,23 +255,28 @@ export default function FocusDay({supabase,user,onSignOut}){
   const toggle=useCallback(async(task)=>{const k=`${task.id}::${selD}`,was=!!comp[k];setComp(p=>{const n={...p};if(was)delete n[k];else n[k]=true;return n;});if(was)await supabase.from('completions').delete().eq('user_id',user.id).eq('task_id',task.id).eq('date',selD);else await supabase.from('completions').insert({user_id:user.id,task_id:task.id,date:selD});},[supabase,user,selD,comp]);
   const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:s.limits,updated_at:new Date().toISOString()});},[supabase,user]);
 
+  // Drag-and-drop: move task to a new date
+  const moveTask=useCallback(async(taskId,newDate)=>{
+    setTasks(p=>p.map(t=>t.id===taskId?{...t,date:newDate}:t));
+    await supabase.from('tasks').update({date:newDate}).eq('id',taskId).eq('user_id',user.id);
+  },[supabase,user]);
+
   const navM=(dir)=>{let m=cM+dir,y=cY;if(m>11){m=0;y++;}else if(m<0){m=11;y--;}setCM(m);setCY(y);};
   const navW=(dir)=>setWS(p=>addDays(p,dir*7));
-  const ctRef=useRef(null);
-  const hClick=(ds)=>{if(ctRef.current)clearTimeout(ctRef.current);ctRef.current=setTimeout(()=>{setSelD(ds);setETask(null);setACat('thing');setMOpen(true);ctRef.current=null;},250);};
-  const hDbl=(ds)=>{if(ctRef.current){clearTimeout(ctRef.current);ctRef.current=null;}setSelD(ds);setView('day');};
 
-  const vL={month:'Mes',week:'Semana',day:'Día'},sd=parseDate(selD);
+  const sd=parseDate(selD);
   const av=user?.user_metadata?.avatar_url,un=user?.user_metadata?.full_name||user?.email||'',fn=(user?.user_metadata?.full_name||'').split(' ')[0]||'';
 
   if(!loaded)return<div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F,color:T.tm}}><div style={{textAlign:'center'}}><div style={{fontSize:28,fontFamily:SF,color:T.text,marginBottom:8}}>Focus Day</div><div style={{fontSize:13}}>Cargando tus tareas...</div></div></div>;
 
   return(
-    <div style={{minHeight:'100vh',background:T.bg,fontFamily:F,color:T.text,padding:'20px 32px 40px'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
+    <div style={{minHeight:'100vh',background:T.bg,fontFamily:F,color:T.text,padding:'20px 32px 40px',display:'flex',flexDirection:'column'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
         <div><h1 style={{margin:0,fontSize:24,fontWeight:400,fontFamily:SF,letterSpacing:'-0.01em'}}>Focus Day</h1>{fn&&<p style={{margin:'2px 0 0',fontSize:13,color:T.tm}}>{getGreeting()}, {fn}</p>}</div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <button onClick={()=>{setSelD(fmt(today));setCM(today.getMonth());setCY(today.getFullYear());setWS(startOfWeek(today));setView('day');}} style={{padding:'7px 14px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.text,fontSize:12,fontWeight:600,fontFamily:F}}>Hoy</button>
+          <button onClick={()=>{setSelD(fmt(today));setCM(today.getMonth());setCY(today.getFullYear());setWS(startOfWeek(today));}} style={{padding:'7px 14px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.text,fontSize:12,fontWeight:600,fontFamily:F}}>Hoy</button>
+          <span style={{fontSize:10,color:T.tm,display:'flex',alignItems:'center',gap:4}}><kbd style={{padding:'1px 5px',borderRadius:3,border:`1px solid ${T.border}`,fontSize:10,fontFamily:F,background:T.surface}}>N</kbd><span>nueva</span></span>
           <button onClick={()=>setSOpen(true)} style={{background:'none',border:'none',cursor:'pointer',padding:6}}><Ic name="settings" size={18} color={T.ts}/></button>
           <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:4}}>
             {av?<img src={av} alt="" style={{width:28,height:28,borderRadius:'50%',border:`1.5px solid ${T.border}`}} referrerPolicy="no-referrer"/>:<div style={{width:28,height:28,borderRadius:'50%',background:T.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:600,color:T.ts}}>{un.charAt(0).toUpperCase()}</div>}
@@ -274,20 +284,39 @@ export default function FocusDay({supabase,user,onSignOut}){
           </div>
         </div>
       </div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-        <div style={{display:'flex',alignItems:'center',gap:4}}>
-          {view!=='day'&&<><button onClick={()=>view==='month'?navM(-1):navW(-1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={18}/></button><span style={{fontSize:15,fontWeight:600,minWidth:160,textAlign:'center',fontFamily:F}}>{view==='month'?`${monthNames[cM]} ${cY}`:`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,6).getDate()} ${monthNames[addDays(wS,6).getMonth()].slice(0,3)}`}</span><button onClick={()=>view==='month'?navM(1):navW(1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button></>}
-          {view==='day'&&<><button onClick={()=>setSelD(fmt(addDays(sd,-1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={18}/></button><span style={{fontSize:15,fontWeight:600,minWidth:180,textAlign:'center',fontFamily:F}}>{sd.getDate()} {monthNames[sd.getMonth()]} {sd.getFullYear()}</span><button onClick={()=>setSelD(fmt(addDays(sd,1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button></>}
+
+      {/* Split layout: Left = DayView, Right = Month/Week */}
+      <div style={{display:'grid',gridTemplateColumns:'340px 1fr',gap:32,flex:1,minHeight:0}}>
+        {/* LEFT: Day View (always visible) */}
+        <div style={{position:'sticky',top:20,alignSelf:'start'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+            <button onClick={()=>setSelD(fmt(addDays(sd,-1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={16}/></button>
+            <span style={{fontSize:14,fontWeight:600,fontFamily:F}}>{sd.getDate()} {monthNames[sd.getMonth()]} {sd.getFullYear()}</span>
+            <button onClick={()=>setSelD(fmt(addDays(sd,1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={16}/></button>
+          </div>
+          <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} settings={settings}/>
+          <button onClick={()=>{setETask(null);setACat('thing');setMOpen(true);}} style={{marginTop:16,width:'100%',padding:'12px',borderRadius:T.rs,border:`1.5px dashed ${T.border}`,cursor:'pointer',background:'transparent',color:T.tm,fontSize:13,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'all 0.2s'}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.text;e.currentTarget.style.color=T.text;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.tm;}}><Ic name="plus" size={16}/>Agregar tarea</button>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <span style={{fontSize:10,color:T.tm,display:'flex',alignItems:'center',gap:4}}><kbd style={{padding:'1px 5px',borderRadius:3,border:`1px solid ${T.border}`,fontSize:10,fontFamily:F,background:T.surface}}>N</kbd><span>nueva</span></span>
-          <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>{['month','week','day'].map(v=><button key={v} onClick={()=>setView(v)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:view===v?600:400,background:view===v?T.text:'transparent',color:view===v?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{vL[v]}</button>)}</div>
+
+        {/* RIGHT: Calendar panel */}
+        <div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:4}}>
+              <button onClick={()=>rightView==='month'?navM(-1):navW(-1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={18}/></button>
+              <span style={{fontSize:15,fontWeight:600,minWidth:160,textAlign:'center',fontFamily:F}}>
+                {rightView==='month'?`${monthNames[cM]} ${cY}`:`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,6).getDate()} ${monthNames[addDays(wS,6).getMonth()].slice(0,3)}`}
+              </span>
+              <button onClick={()=>rightView==='month'?navM(1):navW(1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button>
+            </div>
+            <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
+              {['month','week'].map(v=><button key={v} onClick={()=>setRightView(v)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v?600:400,background:rightView===v?T.text:'transparent',color:rightView===v?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v==='month'?'Mes':'Semana'}</button>)}
+            </div>
+          </div>
+          {rightView==='month'&&<MonthView year={cY} month={cM} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={tasks} completions={comp}/>}
+          {rightView==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={tasks} completions={comp} onMoveTask={moveTask}/>}
         </div>
       </div>
-      {view==='month'&&<MonthView year={cY} month={cM} today={today} selectedDate={selD} onClickDate={hClick} onDoubleClickDate={hDbl} tasks={tasks} completions={comp}/>}
-      {view==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onClickDate={hClick} onDoubleClickDate={hDbl} tasks={tasks} completions={comp}/>}
-      {view==='day'&&<DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} settings={settings}/>}
-      {view==='day'&&<button onClick={()=>{setETask(null);setACat('thing');setMOpen(true);}} style={{position:'fixed',bottom:24,right:24,width:52,height:52,borderRadius:'50%',background:T.text,border:'none',cursor:'pointer',boxShadow:'0 4px 16px rgba(0,0,0,0.2)',display:'flex',alignItems:'center',justifyContent:'center',transition:'transform 0.2s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.08)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}><Ic name="plus" size={22} color="#fff"/></button>}
+
       <TaskModal isOpen={mOpen} onClose={()=>{setMOpen(false);setETask(null);}} onSave={saveTask} onDelete={delTask} task={eTask} dateStr={selD} category={aCat} tasks={tasks} completions={comp} settings={settings} allProjects={allProjects}/>
       <SettingsModal isOpen={sOpen} onClose={()=>setSOpen(false)} settings={settings} onSave={saveSets}/>
     </div>
