@@ -54,7 +54,7 @@ function Ic({name,size=18,color:C,style:s}){
 }
 
 const CAT={thing:{label:'The Thing',color:T.thing,bg:T.thingBg,icon:'target',desc:'Tu prioridad #1'},important:{label:'Important',color:T.imp,bg:T.impBg,icon:'star',desc:'Tareas clave'},maintenance:{label:'Maintenance',color:T.maint,bg:T.maintBg,icon:'settings',desc:'Bajo esfuerzo'}};
-const DSET={limits:{thing:1,important:3,maintenance:99},shortcut:'n'};
+const DSET={limits:{thing:1,important:3,maintenance:99},shortcut:'n',dark:false};
 
 function PPill({name}){if(!name)return null;const c=pColor(name);return <span style={{display:'inline-flex',padding:'1px 6px',borderRadius:20,background:c.bg,color:c.text,border:`1px solid ${c.border}`,fontSize:10,fontWeight:500,fontFamily:F,lineHeight:1.6,whiteSpace:'nowrap',flexShrink:0}}>{name}</span>;}
 
@@ -156,32 +156,41 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
 function SettingsModal({isOpen,onClose,settings,onSave}){
   const [lim,setLim]=useState(settings.limits);
   const [sc,setSc]=useState(settings.shortcut||'n');
-  useEffect(()=>{if(isOpen){setLim(settings.limits);setSc(settings.shortcut||'n');}},[isOpen,settings]);
+  const [dark,setDark]=useState(settings.dark||false);
+  useEffect(()=>{if(isOpen){setLim(settings.limits);setSc(settings.shortcut||'n');setDark(settings.dark||false);}},[isOpen,settings]);
   if(!isOpen)return null;
   return(<div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}><div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',backdropFilter:'blur(4px)'}}/><div onClick={e=>e.stopPropagation()} style={{position:'relative',background:T.surface,borderRadius:T.rl,width:'min(400px,90vw)',boxShadow:'0 20px 60px rgba(0,0,0,0.15)',fontFamily:F,padding:24}}>
     <h3 style={{margin:'0 0 20px',fontSize:18,fontWeight:600,fontFamily:SF,color:T.text}}>Configuración</h3>
     <p style={{fontSize:13,color:T.ts,margin:'0 0 16px'}}>Límite de tareas por categoría.</p>
     {Object.entries(CAT).map(([k,m])=><div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 0',borderBottom:`1px solid ${T.borderLight}`}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:10,height:10,borderRadius:'50%',background:m.color}}/><span style={{fontSize:14,fontWeight:500,color:T.text}}>{m.label}</span></div><input type="number" min={1} max={99} value={lim[k]} onChange={e=>setLim(p=>({...p,[k]:Math.max(1,+e.target.value)}))} style={{width:56,padding:'8px 10px',fontSize:14,fontFamily:F,textAlign:'center',border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none'}}/></div>)}
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4,borderTop:`1px solid ${T.borderLight}`}}>
       <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Atajo nueva tarea</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Tecla para abrir el modal</span></div>
       <input value={sc} onChange={e=>{const v=e.target.value.slice(-1).toLowerCase();if(v&&/^[a-z]$/.test(v))setSc(v);}} onKeyDown={e=>{if(e.key.length===1&&/^[a-z]$/i.test(e.key)){e.preventDefault();setSc(e.key.toLowerCase());}}} style={{width:44,height:44,padding:0,fontSize:18,fontFamily:F,textAlign:'center',fontWeight:700,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',textTransform:'uppercase'}}/>
     </div>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4}}>
+      <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Modo oscuro</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Cambiar tema de la interfaz</span></div>
+      <Toggle on={dark} onToggle={()=>setDark(p=>!p)}/>
+    </div>
     <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
       <button onClick={onClose} style={{padding:'10px 20px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:13,fontWeight:500,fontFamily:F}}>Cancelar</button>
-      <button onClick={()=>{onSave({...settings,limits:lim,shortcut:sc});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F}}>Guardar</button>
+      <button onClick={()=>{onSave({...settings,limits:lim,shortcut:sc,dark});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F}}>Guardar</button>
     </div>
   </div></div>);
 }
 
-function TaskItem({task,onToggle,onEdit}){
-  const m=CAT[task.category],[hov,setHov]=useState(false),[exp,setExp]=useState(false);
+function TaskItem({task,onToggle,onEdit,onCatDrag}){
+  const m=CAT[task.category],[hov,setHov]=useState(false),[exp,setExp]=useState(false),[justChecked,setJC]=useState(false);
   const hasN=!!task.notes;
-  return(<div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}>
-    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:T.rs,cursor:'pointer',transition:'background 0.15s',background:hov?T.surfaceHover:'transparent'}}>
-      <button onClick={e=>{e.stopPropagation();onToggle();}} style={{width:20,height:20,borderRadius:6,border:`2px solid ${task.completed?m.color:T.border}`,background:task.completed?m.color:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.2s',padding:0}}>{task.completed&&<Ic name="check" size={13} color="#fff"/>}</button>
-      <div style={{flex:1,minWidth:0}} onClick={onToggle}>
+  const doToggle=()=>{if(!task.completed)setJC(true);onToggle();setTimeout(()=>setJC(false),600);};
+  return(<div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} draggable
+    onDragStart={e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:task.id,cat:task.category}));e.dataTransfer.effectAllowed='move';}}>
+    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:T.rs,cursor:'grab',transition:'background 0.15s',background:hov?T.surfaceHover:'transparent'}}>
+      <button onClick={e=>{e.stopPropagation();doToggle();}} style={{width:20,height:20,borderRadius:6,border:`2px solid ${task.completed?m.color:T.border}`,background:task.completed?m.color:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.25s',padding:0,transform:justChecked?'scale(1.2)':'scale(1)'}}>
+        {task.completed&&<svg width="13" height="13" viewBox="0 0 24 24" style={{flexShrink:0}}><polyline points="20 6 9 17 4 12" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" style={{strokeDasharray:30,strokeDashoffset:justChecked?30:0,animation:justChecked?'drawCheck 0.4s ease forwards':'none'}}/></svg>}
+      </button>
+      <div style={{flex:1,minWidth:0}} onClick={doToggle}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
-          <span style={{fontSize:14,color:task.completed?T.tm:T.text,textDecoration:task.completed?'line-through':'none',fontFamily:F,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{task.title}</span>
+          <span style={{fontSize:14,color:task.completed?T.tm:T.text,textDecoration:task.completed?'line-through':'none',fontFamily:F,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',transition:'color 0.3s'}}>{task.title}</span>
           {task.project&&(()=>{try{const tgs=JSON.parse(task.project);return Array.isArray(tgs)?tgs.map(t=><PPill key={t} name={t}/>):<PPill name={task.project}/>;}catch{return<PPill name={task.project}/>;}})()}
         </div>
       </div>
@@ -193,24 +202,60 @@ function TaskItem({task,onToggle,onEdit}){
   </div>);
 }
 
-function CatSection({category,tasks,onToggle,onEdit,onAdd,limit}){
+const EMPTY_MSG={thing:['¿Cuál es tu batalla principal hoy?','Define tu prioridad #1','¿Qué moverá la aguja hoy?'],important:['¿Qué 3 cosas importan hoy?','Agrega tus tareas clave','¿Qué debes entregar?'],maintenance:['Tareas rápidas y sencillas','Lo que no requiere enfoque','Correos, admin, rutina']};
+const EMPTY_SVG={thing:<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" opacity="0.3"/><circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" opacity="0.5"/><circle cx="12" cy="12" r="1.5" fill="currentColor" opacity="0.7"/></svg>,important:<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" stroke="currentColor" strokeWidth="1.5" opacity="0.35" fill="none"/></svg>,maintenance:<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" opacity="0.3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="1.5" opacity="0.25" strokeLinecap="round"/></svg>};
+
+function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,limit,dateStr}){
   const m=CAT[category],at=tasks.length>=limit,dc=tasks.filter(t=>t.completed).length;
-  return(<div style={{marginBottom:24}}>
+  const isThing=category==='thing';
+  const [qaOpen,setQaOpen]=useState(false),[qaVal,setQaVal]=useState('');
+  const [dragOver,setDragOver]=useState(false);
+  const qaRef=useRef(null);
+  const doQA=()=>{if(qaVal.trim()){onQuickAdd(qaVal.trim(),category);setQaVal('');setQaOpen(false);}};
+  const emptyMsg=EMPTY_MSG[category][Math.floor(Date.now()/86400000)%EMPTY_MSG[category].length];
+  return(<div style={{marginBottom:isThing?28:20}}
+    onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+    onDragLeave={()=>setDragOver(false)}
+    onDrop={e=>{e.preventDefault();setDragOver(false);try{const d=JSON.parse(e.dataTransfer.getData('text/plain'));if(d.id&&d.cat!==category)onCatChange(d.id,category);}catch{}}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,padding:'0 4px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8}}>
-        <Ic name={m.icon} size={16} color={m.color}/><span style={{fontSize:13,fontWeight:600,color:m.color,textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:F}}>{m.label}</span>
+        <Ic name={m.icon} size={isThing?18:16} color={m.color}/><span style={{fontSize:isThing?14:13,fontWeight:isThing?700:600,color:m.color,textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:F}}>{m.label}</span>
         {tasks.length>0&&<span style={{fontSize:11,color:dc===tasks.length?T.ok:T.tm,fontFamily:F,fontWeight:dc===tasks.length?600:400}}>{dc}/{tasks.length}</span>}
       </div>
-      <button onClick={onAdd} disabled={at} title={at?'Límite alcanzado':'Agregar tarea'} style={{background:'none',border:'none',cursor:at?'not-allowed':'pointer',padding:2,opacity:at?0.15:0.5,transition:'opacity 0.2s'}} onMouseEnter={e=>{if(!at)e.target.style.opacity=1}} onMouseLeave={e=>{if(!at)e.target.style.opacity=0.5}}><Ic name="plus" size={16} color={m.color}/></button>
+      <button onClick={()=>{if(!at){setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}}} disabled={at} title={at?'Límite alcanzado':'Agregar tarea'} style={{background:'none',border:'none',cursor:at?'not-allowed':'pointer',padding:2,opacity:at?0.15:0.5,transition:'opacity 0.2s'}} onMouseEnter={e=>{if(!at)e.target.style.opacity=1}} onMouseLeave={e=>{if(!at)e.target.style.opacity=0.5}}><Ic name="plus" size={16} color={m.color}/></button>
     </div>
-    <div style={{background:T.surface,borderRadius:T.r,border:`1px solid ${T.borderLight}`,minHeight:tasks.length?'auto':44,overflow:'hidden'}}>
-      {tasks.length===0&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'12px 0',opacity:0.35}}><span style={{fontSize:12,color:T.tm,fontStyle:'italic',fontFamily:F}}>{m.desc}</span></div>}
+    <div style={{background:isThing?`linear-gradient(135deg,${T.thingBg},${T.surface})`:T.surface,borderRadius:T.r,border:dragOver?`2px dashed ${m.color}`:isThing?`1.5px solid ${T.thing}22`:`1px solid ${T.borderLight}`,minHeight:tasks.length||qaOpen?'auto':56,overflow:'hidden',transition:'border 0.2s',padding:isThing&&tasks.length===0&&!qaOpen?'4px 0':0}}>
+      {tasks.length===0&&!qaOpen&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px 0',gap:6,color:m.color,opacity:0.4,cursor:'pointer'}} onClick={()=>{if(!at){setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}}}>
+        {EMPTY_SVG[category]}
+        <span style={{fontSize:12,fontFamily:F,fontStyle:'italic'}}>{emptyMsg}</span>
+      </div>}
       {tasks.map(t=><TaskItem key={t.id+'_'+t.date} task={t} onToggle={()=>onToggle(t)} onEdit={()=>onEdit(t)}/>)}
+      {qaOpen&&<div style={{padding:'8px 12px',display:'flex',gap:8,alignItems:'center'}}>
+        <input ref={qaRef} value={qaVal} onChange={e=>setQaVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doQA();if(e.key==='Escape'){setQaOpen(false);setQaVal('');}}} placeholder="Escribe y Enter..." style={{flex:1,padding:'8px 10px',fontSize:13,fontFamily:F,border:`1.5px solid ${m.color}44`,borderRadius:T.rs,outline:'none',background:'transparent',color:T.text}} onBlur={()=>{if(!qaVal.trim()){setQaOpen(false);setQaVal('');}}}/>
+        <button onClick={doQA} style={{background:m.color,color:'#fff',border:'none',borderRadius:T.rs,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:F,opacity:qaVal.trim()?1:0.4}}>+</button>
+      </div>}
     </div>
   </div>);
 }
 
-function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,settings}){
+function Heatmap({tasks,completions}){
+  const today=new Date(),cells=[];
+  for(let i=89;i>=0;i--){const d=addDays(today,-i),ds=fmt(d),dt=tasksFor(tasks,ds,completions),tot=dt.length,done=dt.filter(t=>t.completed).length;
+    const pct=tot>0?done/tot:0;const col=tot===0?T.borderLight:pct===1?T.ok:pct>=0.5?'#86efac':pct>0?'#fde68a':T.border;
+    cells.push({ds,col,d,pct,tot});
+  }
+  return(<div style={{marginTop:16}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.05em',fontFamily:F,textTransform:'uppercase'}}>Últimos 90 días</span></div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(13,1fr)',gap:3}}>{cells.map(c=><div key={c.ds} title={`${c.d.getDate()}/${c.d.getMonth()+1} — ${c.tot>0?Math.round(c.pct*100)+'%':'sin tareas'}`} style={{aspectRatio:'1',borderRadius:3,background:c.col,transition:'transform 0.15s',cursor:'default',minWidth:0}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.3)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}/>)}</div>
+    <div style={{display:'flex',gap:4,alignItems:'center',justifyContent:'flex-end',marginTop:6}}>
+      <span style={{fontSize:9,color:T.tm,fontFamily:F}}>Menos</span>
+      {[T.borderLight,T.border,'#fde68a','#86efac',T.ok].map((c,i)=><div key={i} style={{width:10,height:10,borderRadius:2,background:c}}/>)}
+      <span style={{fontSize:9,color:T.tm,fontFamily:F}}>Más</span>
+    </div>
+  </div>);
+}
+
+function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,settings}){
   const dt=useMemo(()=>tasksFor(tasks,dateStr,completions),[tasks,dateStr,completions]);
   const d=parseDate(dateStr),done=dt.filter(t=>t.completed).length,tot=dt.length,pct=tot>0?Math.round(done/tot*100):0;
   return(<div>
@@ -218,8 +263,8 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,settings}){
       <div><h2 style={{margin:0,fontSize:28,fontWeight:400,color:T.text,fontFamily:SF,lineHeight:1.2}}>{d.getDate()} <span style={{fontSize:20,color:T.ts}}>{monthNames[d.getMonth()]}</span></h2><p style={{margin:'4px 0 0',fontSize:13,color:T.tm,fontFamily:F}}>{dayNamesFull[d.getDay()]}</p></div>
       {tot>0&&<PRing pct={pct}/>}
     </div>
-    {tot===0&&<div style={{textAlign:'center',padding:'32px 0 24px',opacity:0.5}}><p style={{fontSize:14,color:T.tm,fontFamily:F,margin:0}}>Sin tareas para este día.</p><p style={{fontSize:12,color:T.tm,fontFamily:F,margin:'4px 0 0'}}>Presiona <strong>N</strong> o haz clic en <strong>+</strong> para agregar.</p></div>}
-    {['thing','important','maintenance'].map(c=><CatSection key={c} category={c} tasks={dt.filter(t=>t.category===c)} onToggle={onToggle} onEdit={onEdit} onAdd={()=>onAdd(c)} limit={settings.limits[c]}/>)}
+    {['thing','important','maintenance'].map(c=><CatSection key={c} category={c} tasks={dt.filter(t=>t.category===c)} onToggle={onToggle} onEdit={onEdit} onAdd={()=>onAdd(c)} onQuickAdd={onQuickAdd} onCatChange={onCatChange} limit={settings.limits[c]} dateStr={dateStr}/>)}
+    <Heatmap tasks={tasks} completions={completions}/>
   </div>);
 }
 
@@ -287,24 +332,39 @@ export default function FocusDay({supabase,user,onSignOut}){
 
   useEffect(()=>{function onK(e){if(mOpen||sOpen){if(e.key==='Escape'){setMOpen(false);setSOpen(false);setETask(null);}return;}const sd=parseDate(selD);if(e.key==='ArrowLeft'){e.preventDefault();setSelD(fmt(addDays(sd,-1)));}if(e.key==='ArrowRight'){e.preventDefault();setSelD(fmt(addDays(sd,1)));}if(e.key===(settings.shortcut||'n')&&!e.metaKey&&!e.ctrlKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'&&document.activeElement?.tagName!=='SELECT'){e.preventDefault();setETask(null);setACat('thing');setMOpen(true);}}window.addEventListener('keydown',onK);return()=>window.removeEventListener('keydown',onK);},[mOpen,sOpen,selD,settings.shortcut]);
 
+  useEffect(()=>{document.documentElement.setAttribute('data-theme',settings.dark?'dark':'light');},[settings.dark]);
+
   useEffect(()=>{if(!user)return;async function ld(){
     const{data:tr}=await supabase.from('tasks').select('*').eq('user_id',user.id);
     setTasks((tr||[]).map(r=>({id:r.id,title:r.title,notes:r.notes||'',project:r.project||'',category:r.category,date:r.date,recurrence:r.recurrence||{type:'none'},createdAt:r.created_at})));
     const{data:cr}=await supabase.from('completions').select('*').eq('user_id',user.id);const lc={};(cr||[]).forEach(r=>{lc[`${r.task_id}::${r.date}`]=true;});setComp(lc);
     const{data:sr}=await supabase.from('user_settings').select('*').eq('user_id',user.id).single();
-    const rawLim=sr?.limits||{};const{_shortcut,...limOnly}=rawLim;
-    setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n'}:DSET);setLoaded(true);
+    const rawLim=sr?.limits||{};const{_shortcut,_dark,...limOnly}=rawLim;
+    setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n',dark:!!_dark}:DSET);setLoaded(true);
   }ld();},[user,supabase]);
 
   const saveTask=useCallback(async(t)=>{setTasks(p=>{const i=p.findIndex(x=>x.id===t.id);if(i>=0){const n=[...p];n[i]=t;return n;}return[...p,t];});await supabase.from('tasks').upsert({id:t.id,user_id:user.id,title:t.title,notes:t.notes||'',project:t.project||'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});},[supabase,user]);
   const delTask=useCallback(async(id)=>{setTasks(p=>p.filter(t=>t.id!==id));setComp(p=>{const n={...p};Object.keys(n).filter(k=>k.startsWith(id+'::')).forEach(k=>delete n[k]);return n;});await supabase.from('tasks').delete().eq('id',id).eq('user_id',user.id);},[supabase,user]);
   const toggle=useCallback(async(task)=>{const k=`${task.id}::${selD}`,was=!!comp[k];setComp(p=>{const n={...p};if(was)delete n[k];else n[k]=true;return n;});if(was)await supabase.from('completions').delete().eq('user_id',user.id).eq('task_id',task.id).eq('date',selD);else await supabase.from('completions').insert({user_id:user.id,task_id:task.id,date:selD});},[supabase,user,selD,comp]);
-  const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n'},updated_at:new Date().toISOString()});},[supabase,user]);
+  const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n',_dark:!!s.dark},updated_at:new Date().toISOString()});},[supabase,user]);
 
   // Drag-and-drop: move task to a new date
   const moveTask=useCallback(async(taskId,newDate)=>{
     setTasks(p=>p.map(t=>t.id===taskId?{...t,date:newDate}:t));
     await supabase.from('tasks').update({date:newDate}).eq('id',taskId).eq('user_id',user.id);
+  },[supabase,user]);
+
+  // Quick-add: create task inline
+  const quickAdd=useCallback(async(title,category)=>{
+    const t={id:uid(),title,notes:'',project:'',category,date:selD,recurrence:{type:'none'},createdAt:Date.now()};
+    setTasks(p=>[...p,t]);
+    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
+  },[supabase,user,selD]);
+
+  // Change task category (drag between sections)
+  const catChange=useCallback(async(taskId,newCat)=>{
+    setTasks(p=>p.map(t=>t.id===taskId?{...t,category:newCat}:t));
+    await supabase.from('tasks').update({category:newCat}).eq('id',taskId).eq('user_id',user.id);
   },[supabase,user]);
 
   const navM=(dir)=>{let m=cM+dir,y=cY;if(m>11){m=0;y++;}else if(m<0){m=11;y--;}setCM(m);setCY(y);};
@@ -314,6 +374,10 @@ export default function FocusDay({supabase,user,onSignOut}){
   const av=user?.user_metadata?.avatar_url,un=user?.user_metadata?.full_name||user?.email||'',fn=(user?.user_metadata?.full_name||'').split(' ')[0]||'';
 
   if(!loaded)return<div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F,color:T.tm}}><div style={{textAlign:'center'}}><div style={{fontSize:28,fontFamily:SF,color:T.text,marginBottom:8}}>Focus Day</div><div style={{fontSize:13}}>Cargando tus tareas...</div></div></div>;
+
+  // Dynamic theme
+  if(settings.dark){Object.assign(T,{bg:'#0a0a0a',surface:'#161616',surfaceHover:'#1e1e1e',border:'#2a2a2a',borderLight:'#222',text:'#e7e5e4',ts:'#a8a29e',tm:'#78716c',accentSoft:'#1a1a1a',thingBg:'#1c0a0a',impBg:'#0a1628',maintBg:'#161616',okBg:'#0a1a0f'});}
+  else{Object.assign(T,{bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thingBg:'#fef2f2',impBg:'#eff6ff',maintBg:'#f5f5f4',okBg:'#f0fdf4'});}
 
   return(
     <div style={{height:'100vh',background:'transparent',fontFamily:F,color:T.text,padding:'20px 32px 24px',display:'flex',flexDirection:'column',overflow:'hidden',position:'relative',zIndex:1}}>
@@ -339,7 +403,7 @@ export default function FocusDay({supabase,user,onSignOut}){
             <span style={{fontSize:14,fontWeight:600,fontFamily:F}}>{sd.getDate()} {monthNames[sd.getMonth()]} {sd.getFullYear()}</span>
             <button onClick={()=>setSelD(fmt(addDays(sd,1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={16}/></button>
           </div>
-          <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} settings={settings}/>
+          <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} onQuickAdd={quickAdd} onCatChange={catChange} settings={settings}/>
           <button onClick={()=>{setETask(null);setACat('thing');setMOpen(true);}} style={{marginTop:16,width:'100%',padding:'12px',borderRadius:T.rs,border:`1.5px dashed ${T.border}`,cursor:'pointer',background:'transparent',color:T.tm,fontSize:13,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'all 0.2s'}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.text;e.currentTarget.style.color=T.text;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.tm;}}><Ic name="plus" size={16}/>Agregar tarea</button>
         </div>
 
