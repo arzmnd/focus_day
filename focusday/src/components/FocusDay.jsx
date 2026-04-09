@@ -49,12 +49,14 @@ function Ic({name,size=18,color:C,style:s}){
     star:<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill={C||T.text} stroke="none"/>,
     logout:<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke={C||T.ts} strokeWidth="1.8" fill="none" strokeLinecap="round"/><polyline points="16 17 21 12 16 7" stroke={C||T.ts} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke={C||T.ts} strokeWidth="1.8" strokeLinecap="round"/></>,
     note:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round"/><polyline points="14 2 14 8 20 8" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round"/></>,
+    focus:<><circle cx="12" cy="12" r="10" stroke={C||T.thing} strokeWidth="1.8" fill="none"/><polygon points="10 8 16 12 10 16" fill={C||T.thing}/></>,
+    pause:<><rect x="6" y="4" width="4" height="16" rx="1" fill={C||T.text}/><rect x="14" y="4" width="4" height="16" rx="1" fill={C||T.text}/></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" style={{flexShrink:0,...s}}>{m[name]}</svg>;
 }
 
 const CAT={thing:{label:'The Thing',color:T.thing,bg:T.thingBg,icon:'target',desc:'Tu prioridad #1'},important:{label:'Important',color:T.imp,bg:T.impBg,icon:'star',desc:'Tareas clave'},maintenance:{label:'Maintenance',color:T.maint,bg:T.maintBg,icon:'settings',desc:'Bajo esfuerzo'}};
-const DSET={limits:{thing:1,important:3,maintenance:99},shortcut:'n',dark:false};
+const DSET={limits:{thing:1,important:3,maintenance:99},shortcut:'n',dark:false,workWeek:false};
 
 function PPill({name}){if(!name)return null;const c=pColor(name);return <span style={{display:'inline-flex',padding:'1px 6px',borderRadius:20,background:c.bg,color:c.text,border:`1px solid ${c.border}`,fontSize:10,fontWeight:500,fontFamily:F,lineHeight:1.6,whiteSpace:'nowrap',flexShrink:0}}>{name}</span>;}
 
@@ -157,7 +159,8 @@ function SettingsModal({isOpen,onClose,settings,onSave}){
   const [lim,setLim]=useState(settings.limits);
   const [sc,setSc]=useState(settings.shortcut||'n');
   const [dark,setDark]=useState(settings.dark||false);
-  useEffect(()=>{if(isOpen){setLim(settings.limits);setSc(settings.shortcut||'n');setDark(settings.dark||false);}},[isOpen,settings]);
+  const [ww,setWw]=useState(settings.workWeek||false);
+  useEffect(()=>{if(isOpen){setLim(settings.limits);setSc(settings.shortcut||'n');setDark(settings.dark||false);setWw(settings.workWeek||false);}},[isOpen,settings]);
   if(!isOpen)return null;
   return(<div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}><div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',backdropFilter:'blur(4px)'}}/><div onClick={e=>e.stopPropagation()} style={{position:'relative',background:T.surface,borderRadius:T.rl,width:'min(400px,90vw)',boxShadow:'0 20px 60px rgba(0,0,0,0.15)',fontFamily:F,padding:24}}>
     <h3 style={{margin:'0 0 20px',fontSize:18,fontWeight:600,fontFamily:SF,color:T.text}}>Configuración</h3>
@@ -168,12 +171,16 @@ function SettingsModal({isOpen,onClose,settings,onSave}){
       <input value={sc} onChange={e=>{const v=e.target.value.slice(-1).toLowerCase();if(v&&/^[a-z]$/.test(v))setSc(v);}} onKeyDown={e=>{if(e.key.length===1&&/^[a-z]$/i.test(e.key)){e.preventDefault();setSc(e.key.toLowerCase());}}} style={{width:44,height:44,padding:0,fontSize:18,fontFamily:F,textAlign:'center',fontWeight:700,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',textTransform:'uppercase'}}/>
     </div>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4}}>
+      <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Semana laboral</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Mostrar Lun–Vie como default</span></div>
+      <Toggle on={ww} onToggle={()=>setWw(p=>!p)}/>
+    </div>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4}}>
       <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Modo oscuro</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Cambiar tema de la interfaz</span></div>
       <Toggle on={dark} onToggle={()=>setDark(p=>!p)}/>
     </div>
     <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
       <button onClick={onClose} style={{padding:'10px 20px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:13,fontWeight:500,fontFamily:F}}>Cancelar</button>
-      <button onClick={()=>{onSave({...settings,limits:lim,shortcut:sc,dark});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F}}>Guardar</button>
+      <button onClick={()=>{onSave({...settings,limits:lim,shortcut:sc,dark,workWeek:ww});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F}}>Guardar</button>
     </div>
   </div></div>);
 }
@@ -224,7 +231,7 @@ function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange
       </div>
       <button onClick={()=>{if(!at){setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}}} disabled={at} title={at?'Límite alcanzado':'Agregar tarea'} style={{background:'none',border:'none',cursor:at?'not-allowed':'pointer',padding:2,opacity:at?0.15:0.5,transition:'opacity 0.2s'}} onMouseEnter={e=>{if(!at)e.target.style.opacity=1}} onMouseLeave={e=>{if(!at)e.target.style.opacity=0.5}}><Ic name="plus" size={16} color={m.color}/></button>
     </div>
-    <div style={{background:isThing?`linear-gradient(135deg,${T.thingBg},${T.surface})`:T.surface,borderRadius:T.r,border:dragOver?`2px dashed ${m.color}`:isThing?`1.5px solid ${T.thing}22`:`1px solid ${T.borderLight}`,minHeight:tasks.length||qaOpen?'auto':56,overflow:'hidden',transition:'border 0.2s',padding:isThing&&tasks.length===0&&!qaOpen?'4px 0':0}}>
+    <div data-animate="" style={{background:isThing?`linear-gradient(135deg,${T.thingBg},${T.surface})`:T.surface,borderRadius:T.r,border:dragOver?`2px dashed ${m.color}`:isThing?`1.5px solid ${T.thing}22`:`1px solid ${T.borderLight}`,minHeight:tasks.length||qaOpen?'auto':56,overflow:'hidden',transition:'border 0.2s',padding:isThing&&tasks.length===0&&!qaOpen?'4px 0':0}}>
       {tasks.length===0&&!qaOpen&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px 0',gap:6,color:m.color,opacity:0.4,cursor:'pointer'}} onClick={()=>{if(!at){setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}}}>
         {EMPTY_SVG[category]}
         <span style={{fontSize:12,fontFamily:F,fontStyle:'italic'}}>{emptyMsg}</span>
@@ -258,7 +265,7 @@ function Heatmap({tasks,completions}){
 function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,settings}){
   const dt=useMemo(()=>tasksFor(tasks,dateStr,completions),[tasks,dateStr,completions]);
   const d=parseDate(dateStr),done=dt.filter(t=>t.completed).length,tot=dt.length,pct=tot>0?Math.round(done/tot*100):0;
-  return(<div>
+  return(<div key={dateStr} style={{animation:'fadeSlideIn 0.2s ease'}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
       <div><h2 style={{margin:0,fontSize:28,fontWeight:400,color:T.text,fontFamily:SF,lineHeight:1.2}}>{d.getDate()} <span style={{fontSize:20,color:T.ts}}>{monthNames[d.getMonth()]}</span></h2><p style={{margin:'4px 0 0',fontSize:13,color:T.tm,fontFamily:F}}>{dayNamesFull[d.getDay()]}</p></div>
       {tot>0&&<PRing pct={pct}/>}
@@ -282,19 +289,28 @@ function MonthView({year,month,today,selectedDate,onSelectDate,tasks,completions
   </div>);
 }
 
-function WeekView({weekStart,today,selectedDate,onSelectDate,tasks,completions,onMoveTask}){
-  const days=Array.from({length:21},(_,i)=>addDays(weekStart,i));
+function WeekView({weekStart,today,selectedDate,onSelectDate,tasks,completions,onMoveTask,settings}){
+  const ww=settings?.workWeek;
+  const dn=ww?['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']:dayNames;
+  const allDays=Array.from({length:21},(_,i)=>addDays(weekStart,i));
+  const days=ww?allDays.filter(d=>{const dw=d.getDay();return dw>=1&&dw<=5;}):allDays;
+  const cols=ww?5:7;const rows=ww?3:3;
+  const maxTasks=(settings?.limits?.thing||1)+(settings?.limits?.important||3)+(settings?.limits?.maintenance||99);
+  const capLoad=Math.min(maxTasks,8);
   const tr={display:'block',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'};
   const [dragOver,setDragOver]=useState(null);
   return(<div style={{display:'flex',flexDirection:'column',flex:1}}>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>{dayNames.map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'repeat(3,1fr)',gap:6,flex:1}}>{days.map(d=>{
+    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:2,marginBottom:4}}>{dn.slice(0,cols).map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
+    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${rows},1fr)`,gap:6,flex:1}}>{days.map(d=>{
     const ds=fmt(d),isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),tt=dt.find(t=>t.category==='thing'),im=dt.filter(t=>t.category==='important'),ma=dt.filter(t=>t.category==='maintenance'),hT=!!tt,hI=im.length>0,hM=ma.length>0,ad=dt.length>0&&dt.every(t=>t.completed);
+    const load=Math.min(dt.length/capLoad,1);const loadCol=ad?T.ok:load>0.7?T.thing:load>0.4?'#f59e0b':T.imp;
     return<div key={ds} onClick={()=>onSelectDate(ds)}
       onDragOver={e=>{e.preventDefault();setDragOver(ds);}}
       onDragLeave={()=>setDragOver(null)}
       onDrop={e=>{e.preventDefault();setDragOver(null);const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
-      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isS?`2px solid ${T.text}`:dragOver===ds?`2px dashed ${T.imp}`:isT?`2px solid ${T.tm}`:`1px solid ${T.borderLight}`,background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.15s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,minHeight:0}}>
+      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isS?`2px solid ${T.text}`:dragOver===ds?`2px dashed ${T.imp}`:isT?`2px solid ${T.tm}`:`1px solid ${T.borderLight}`,background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.15s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,minHeight:0,position:'relative'}}>
+      {/* Load indicator bar */}
+      {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'6px 6px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><span style={{fontSize:10,color:T.tm}}>{monthNames[d.getMonth()].slice(0,3)}</span><span style={{fontSize:15,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div>
       <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
         {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:11,padding:'3px 6px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
@@ -307,12 +323,46 @@ function WeekView({weekStart,today,selectedDate,onSelectDate,tasks,completions,o
   </div>);
 }
 
+// ─── Focus Mode with Pomodoro ─────────────────────────────────────
+function FocusMode({task,onToggle,onExit}){
+  const [sec,setSec]=useState(25*60),[running,setRunning]=useState(false),[mode,setMode]=useState('work');
+  const intRef=useRef(null);
+  useEffect(()=>{if(running){intRef.current=setInterval(()=>setSec(p=>{if(p<=1){clearInterval(intRef.current);setRunning(false);const next=mode==='work'?'break':'work';setMode(next);return next==='break'?5*60:25*60;}return p-1;}),1000);}else clearInterval(intRef.current);return()=>clearInterval(intRef.current);},[running,mode]);
+  const mm=String(Math.floor(sec/60)).padStart(2,'0'),ss=String(sec%60).padStart(2,'0');
+  const pct=mode==='work'?(1-sec/(25*60))*100:(1-sec/(5*60))*100;
+  const sz=180,sw=6,r=(sz-sw)/2,ci=2*Math.PI*r,off=ci-(pct/100)*ci;
+  return(
+    <div style={{position:'fixed',inset:0,zIndex:900,background:T.bg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:F,transition:'opacity 0.3s'}}>
+      <button onClick={onExit} style={{position:'absolute',top:24,right:32,background:'none',border:'none',cursor:'pointer',padding:8,opacity:0.5}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}><Ic name="x" size={24} color={T.ts}/></button>
+      <span style={{fontSize:12,fontWeight:600,color:mode==='work'?T.thing:T.ok,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:24}}>{mode==='work'?'Enfoque':'Descanso'}</span>
+      <div style={{position:'relative',width:sz,height:sz,marginBottom:32}}>
+        <svg width={sz} height={sz} style={{transform:'rotate(-90deg)'}}><circle cx={sz/2} cy={sz/2} r={r} fill="none" stroke={T.border} strokeWidth={sw}/><circle cx={sz/2} cy={sz/2} r={r} fill="none" stroke={mode==='work'?T.thing:T.ok} strokeWidth={sw} strokeDasharray={ci} strokeDashoffset={off} strokeLinecap="round" style={{transition:'stroke-dashoffset 1s linear'}}/></svg>
+        <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+          <span style={{fontSize:48,fontWeight:300,color:T.text,fontFamily:F,letterSpacing:'-0.02em'}}>{mm}:{ss}</span>
+        </div>
+      </div>
+      {task&&<div style={{textAlign:'center',marginBottom:32,maxWidth:400}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:8}}><Ic name="target" size={20}/><span style={{fontSize:20,fontWeight:600,color:T.text,fontFamily:SF}}>{task.title}</span></div>
+        {task.notes&&<p style={{fontSize:13,color:T.ts,margin:0,lineHeight:1.5}}>{task.notes}</p>}
+      </div>}
+      <div style={{display:'flex',gap:12}}>
+        <button onClick={()=>setRunning(p=>!p)} style={{width:56,height:56,borderRadius:'50%',background:mode==='work'?T.thing:T.ok,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 16px rgba(0,0,0,0.15)',transition:'transform 0.2s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.08)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}><Ic name={running?'pause':'focus'} size={22} color="#fff"/></button>
+        {task&&!task.completed&&<button onClick={()=>{onToggle();onExit();}} style={{padding:'14px 28px',borderRadius:T.r,border:`1.5px solid ${T.border}`,background:T.surface,cursor:'pointer',fontSize:14,fontWeight:600,color:T.text,fontFamily:F,transition:'all 0.2s'}} onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background=T.surface}>Completar tarea</button>}
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:20}}>
+        {[15,25,45].map(m=><button key={m} onClick={()=>{setSec(m*60);setRunning(false);setMode('work');}} style={{padding:'6px 14px',borderRadius:T.rs,border:`1px solid ${sec===m*60&&mode==='work'?T.text:T.border}`,background:sec===m*60&&mode==='work'?T.accentSoft:'transparent',cursor:'pointer',fontSize:12,color:T.ts,fontFamily:F}}>{m}min</button>)}
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 export default function FocusDay({supabase,user,onSignOut}){
   const [loaded,setLoaded]=useState(false),[tasks,setTasks]=useState([]),[comp,setComp]=useState({}),[settings,setSettings]=useState(DSET);
   const [rightView,setRightView]=useState('week'),[today]=useState(new Date()),[selD,setSelD]=useState(fmt(new Date()));
   const [cM,setCM]=useState(new Date().getMonth()),[cY,setCY]=useState(new Date().getFullYear()),[wS,setWS]=useState(startOfWeek(new Date()));
   const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
+  const [focusMode,setFocusMode]=useState(false);
   const allTags=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.project){try{const a=JSON.parse(t.project);if(Array.isArray(a))a.forEach(x=>s.add(x));else if(t.project)s.add(t.project);}catch{s.add(t.project);}}});return[...s].sort();},[tasks]);
   // When showRec is off, show only the next uncompleted occurrence per recurring task
   const calTasks=useMemo(()=>{
@@ -339,14 +389,14 @@ export default function FocusDay({supabase,user,onSignOut}){
     setTasks((tr||[]).map(r=>({id:r.id,title:r.title,notes:r.notes||'',project:r.project||'',category:r.category,date:r.date,recurrence:r.recurrence||{type:'none'},createdAt:r.created_at})));
     const{data:cr}=await supabase.from('completions').select('*').eq('user_id',user.id);const lc={};(cr||[]).forEach(r=>{lc[`${r.task_id}::${r.date}`]=true;});setComp(lc);
     const{data:sr}=await supabase.from('user_settings').select('*').eq('user_id',user.id).single();
-    const rawLim=sr?.limits||{};const{_shortcut,_dark,...limOnly}=rawLim;
-    setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n',dark:!!_dark}:DSET);setLoaded(true);
+    const rawLim=sr?.limits||{};const{_shortcut,_dark,_workWeek,...limOnly}=rawLim;
+    setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n',dark:!!_dark,workWeek:!!_workWeek}:DSET);setLoaded(true);
   }ld();},[user,supabase]);
 
   const saveTask=useCallback(async(t)=>{setTasks(p=>{const i=p.findIndex(x=>x.id===t.id);if(i>=0){const n=[...p];n[i]=t;return n;}return[...p,t];});await supabase.from('tasks').upsert({id:t.id,user_id:user.id,title:t.title,notes:t.notes||'',project:t.project||'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});},[supabase,user]);
   const delTask=useCallback(async(id)=>{setTasks(p=>p.filter(t=>t.id!==id));setComp(p=>{const n={...p};Object.keys(n).filter(k=>k.startsWith(id+'::')).forEach(k=>delete n[k]);return n;});await supabase.from('tasks').delete().eq('id',id).eq('user_id',user.id);},[supabase,user]);
   const toggle=useCallback(async(task)=>{const k=`${task.id}::${selD}`,was=!!comp[k];setComp(p=>{const n={...p};if(was)delete n[k];else n[k]=true;return n;});if(was)await supabase.from('completions').delete().eq('user_id',user.id).eq('task_id',task.id).eq('date',selD);else await supabase.from('completions').insert({user_id:user.id,task_id:task.id,date:selD});},[supabase,user,selD,comp]);
-  const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n',_dark:!!s.dark},updated_at:new Date().toISOString()});},[supabase,user]);
+  const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n',_dark:!!s.dark,_workWeek:!!s.workWeek},updated_at:new Date().toISOString()});},[supabase,user]);
 
   // Drag-and-drop: move task to a new date
   const moveTask=useCallback(async(taskId,newDate)=>{
@@ -376,7 +426,8 @@ export default function FocusDay({supabase,user,onSignOut}){
   if(!loaded)return<div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F,color:T.tm}}><div style={{textAlign:'center'}}><div style={{fontSize:28,fontFamily:SF,color:T.text,marginBottom:8}}>Focus Day</div><div style={{fontSize:13}}>Cargando tus tareas...</div></div></div>;
 
   // Dynamic theme
-  if(settings.dark){Object.assign(T,{bg:'#1a1a1a',surface:'#242424',surfaceHover:'#2e2e2e',border:'#3a3a3a',borderLight:'#333',text:'#e7e5e4',ts:'#a8a29e',tm:'#78716c',accentSoft:'#2a2a2a',thingBg:'#2c1a1a',impBg:'#1a2638',maintBg:'#242424',okBg:'#1a2a1f'});}  else{Object.assign(T,{bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thingBg:'#fef2f2',impBg:'#eff6ff',maintBg:'#f5f5f4',okBg:'#f0fdf4'});}
+  if(settings.dark){Object.assign(T,{bg:'#1a1a1a',surface:'#242424',surfaceHover:'#2e2e2e',border:'#3a3a3a',borderLight:'#333',text:'#e7e5e4',ts:'#a8a29e',tm:'#78716c',accentSoft:'#2a2a2a',thingBg:'#2c1a1a',impBg:'#1a2638',maintBg:'#242424',okBg:'#1a2a1f'});}
+  else{Object.assign(T,{bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thingBg:'#fef2f2',impBg:'#eff6ff',maintBg:'#f5f5f4',okBg:'#f0fdf4'});}
 
   return(
     <div style={{height:'100vh',background:'transparent',fontFamily:F,color:T.text,padding:'20px 32px 24px',display:'flex',flexDirection:'column',overflow:'hidden',position:'relative',zIndex:1}}>
@@ -404,6 +455,7 @@ export default function FocusDay({supabase,user,onSignOut}){
           </div>
           <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} onQuickAdd={quickAdd} onCatChange={catChange} settings={settings}/>
           <button onClick={()=>{setETask(null);setACat('thing');setMOpen(true);}} style={{marginTop:16,width:'100%',padding:'12px',borderRadius:T.rs,border:`1.5px dashed ${T.border}`,cursor:'pointer',background:'transparent',color:T.tm,fontSize:13,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'all 0.2s'}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.text;e.currentTarget.style.color=T.text;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.tm;}}><Ic name="plus" size={16}/>Agregar tarea</button>
+          {(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return theThing?<button onClick={()=>setFocusMode(true)} style={{marginTop:8,width:'100%',padding:'10px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.thing,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'transform 0.2s',opacity:0.9}} onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.02)';e.currentTarget.style.opacity='1';}} onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.opacity='0.9';}}><Ic name="focus" size={16} color="#fff"/>Focus Mode</button>:null;})()}
         </div>
 
         {/* RIGHT: Calendar panel */}
@@ -424,12 +476,13 @@ export default function FocusDay({supabase,user,onSignOut}){
             </div>
           </div>
           {rightView==='month'&&<MonthView year={cY} month={cM} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={calTasks} completions={comp}/>}
-          {rightView==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={calTasks} completions={comp} onMoveTask={moveTask}/>}
+          {rightView==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={calTasks} completions={comp} onMoveTask={moveTask} settings={settings}/>}
         </div>
       </div>
 
       <TaskModal isOpen={mOpen} onClose={()=>{setMOpen(false);setETask(null);}} onSave={saveTask} onDelete={delTask} task={eTask} dateStr={selD} category={aCat} tasks={tasks} completions={comp} settings={settings} allTags={allTags}/>
       <SettingsModal isOpen={sOpen} onClose={()=>setSOpen(false)} settings={settings} onSave={saveSets}/>
+      {focusMode&&(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return<FocusMode task={theThing} onToggle={()=>{if(theThing)toggle(theThing);}} onExit={()=>setFocusMode(false)}/>;})()}
     </div>
   );
 }
