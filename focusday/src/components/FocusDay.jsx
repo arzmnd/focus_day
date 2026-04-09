@@ -54,7 +54,7 @@ function Ic({name,size=18,color:C,style:s}){
 }
 
 const CAT={thing:{label:'The Thing',color:T.thing,bg:T.thingBg,icon:'target',desc:'Tu prioridad #1'},important:{label:'Important',color:T.imp,bg:T.impBg,icon:'star',desc:'Tareas clave'},maintenance:{label:'Maintenance',color:T.maint,bg:T.maintBg,icon:'settings',desc:'Bajo esfuerzo'}};
-const DSET={limits:{thing:1,important:3,maintenance:99}};
+const DSET={limits:{thing:1,important:3,maintenance:99},shortcut:'n'};
 
 function PPill({name}){if(!name)return null;const c=pColor(name);return <span style={{display:'inline-flex',padding:'1px 6px',borderRadius:20,background:c.bg,color:c.text,border:`1px solid ${c.border}`,fontSize:10,fontWeight:500,fontFamily:F,lineHeight:1.6,whiteSpace:'nowrap',flexShrink:0}}>{name}</span>;}
 
@@ -155,15 +155,20 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
 
 function SettingsModal({isOpen,onClose,settings,onSave}){
   const [lim,setLim]=useState(settings.limits);
-  useEffect(()=>{if(isOpen)setLim(settings.limits);},[isOpen,settings]);
+  const [sc,setSc]=useState(settings.shortcut||'n');
+  useEffect(()=>{if(isOpen){setLim(settings.limits);setSc(settings.shortcut||'n');}},[isOpen,settings]);
   if(!isOpen)return null;
   return(<div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}><div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',backdropFilter:'blur(4px)'}}/><div onClick={e=>e.stopPropagation()} style={{position:'relative',background:T.surface,borderRadius:T.rl,width:'min(400px,90vw)',boxShadow:'0 20px 60px rgba(0,0,0,0.15)',fontFamily:F,padding:24}}>
     <h3 style={{margin:'0 0 20px',fontSize:18,fontWeight:600,fontFamily:SF,color:T.text}}>Configuración</h3>
     <p style={{fontSize:13,color:T.ts,margin:'0 0 16px'}}>Límite de tareas por categoría.</p>
     {Object.entries(CAT).map(([k,m])=><div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 0',borderBottom:`1px solid ${T.borderLight}`}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:10,height:10,borderRadius:'50%',background:m.color}}/><span style={{fontSize:14,fontWeight:500,color:T.text}}>{m.label}</span></div><input type="number" min={1} max={99} value={lim[k]} onChange={e=>setLim(p=>({...p,[k]:Math.max(1,+e.target.value)}))} style={{width:56,padding:'8px 10px',fontSize:14,fontFamily:F,textAlign:'center',border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none'}}/></div>)}
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4}}>
+      <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Atajo nueva tarea</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Tecla para abrir el modal</span></div>
+      <input value={sc} onChange={e=>{const v=e.target.value.slice(-1).toLowerCase();if(v&&/^[a-z]$/.test(v))setSc(v);}} onKeyDown={e=>{if(e.key.length===1&&/^[a-z]$/i.test(e.key)){e.preventDefault();setSc(e.key.toLowerCase());}}} style={{width:44,height:44,padding:0,fontSize:18,fontFamily:F,textAlign:'center',fontWeight:700,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',textTransform:'uppercase'}}/>
+    </div>
     <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
       <button onClick={onClose} style={{padding:'10px 20px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:13,fontWeight:500,fontFamily:F}}>Cancelar</button>
-      <button onClick={()=>{onSave({...settings,limits:lim});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F}}>Guardar</button>
+      <button onClick={()=>{onSave({...settings,limits:lim,shortcut:sc});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F}}>Guardar</button>
     </div>
   </div></div>);
 }
@@ -174,7 +179,7 @@ function TaskItem({task,onToggle,onEdit}){
   return(<div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}>
     <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:T.rs,cursor:'pointer',transition:'background 0.15s',background:hov?T.surfaceHover:'transparent'}}>
       <button onClick={e=>{e.stopPropagation();onToggle();}} style={{width:20,height:20,borderRadius:6,border:`2px solid ${task.completed?m.color:T.border}`,background:task.completed?m.color:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.2s',padding:0}}>{task.completed&&<Ic name="check" size={13} color="#fff"/>}</button>
-      <div style={{flex:1,minWidth:0}} onClick={onEdit}>
+      <div style={{flex:1,minWidth:0}} onClick={onToggle}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontSize:14,color:task.completed?T.tm:T.text,textDecoration:task.completed?'line-through':'none',fontFamily:F,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{task.title}</span>
           {task.project&&(()=>{try{const tgs=JSON.parse(task.project);return Array.isArray(tgs)?tgs.map(t=><PPill key={t} name={t}/>):<PPill name={task.project}/>;}catch{return<PPill name={task.project}/>;}})()}
@@ -182,7 +187,7 @@ function TaskItem({task,onToggle,onEdit}){
       </div>
       {task.recurrence?.type&&task.recurrence.type!=='none'&&<Ic name="repeat" size={14}/>}
       {hasN&&<button onClick={e=>{e.stopPropagation();setExp(!exp);}} style={{background:'none',border:'none',cursor:'pointer',padding:2,opacity:exp?1:0.4,transition:'opacity 0.2s'}}><Ic name="note" size={14}/></button>}
-      {hov&&<button onClick={e=>{e.stopPropagation();onEdit();}} style={{background:'none',border:'none',cursor:'pointer',padding:2}}><Ic name="edit" size={14}/></button>}
+      {hov&&<button onClick={e=>{e.stopPropagation();onEdit();}} style={{background:'none',border:'none',cursor:'pointer',padding:2,opacity:0.5,transition:'opacity 0.15s'}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}><Ic name="edit" size={11}/></button>}
     </div>
     {exp&&hasN&&<div style={{margin:'0 12px 8px 42px',padding:'8px 12px',background:T.bg,borderRadius:T.rs,border:`1px solid ${T.borderLight}`,fontSize:13,color:T.ts,lineHeight:1.5,fontFamily:F,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{task.notes}</div>}
   </div>);
@@ -280,20 +285,21 @@ export default function FocusDay({supabase,user,onSignOut}){
     });
   },[tasks,showRec,comp]);
 
-  useEffect(()=>{function onK(e){if(mOpen||sOpen){if(e.key==='Escape'){setMOpen(false);setSOpen(false);setETask(null);}return;}const sd=parseDate(selD);if(e.key==='ArrowLeft'){e.preventDefault();setSelD(fmt(addDays(sd,-1)));}if(e.key==='ArrowRight'){e.preventDefault();setSelD(fmt(addDays(sd,1)));}if(e.key==='n'&&!e.metaKey&&!e.ctrlKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'&&document.activeElement?.tagName!=='SELECT'){e.preventDefault();setETask(null);setACat('thing');setMOpen(true);}}window.addEventListener('keydown',onK);return()=>window.removeEventListener('keydown',onK);},[mOpen,sOpen,selD]);
+  useEffect(()=>{function onK(e){if(mOpen||sOpen){if(e.key==='Escape'){setMOpen(false);setSOpen(false);setETask(null);}return;}const sd=parseDate(selD);if(e.key==='ArrowLeft'){e.preventDefault();setSelD(fmt(addDays(sd,-1)));}if(e.key==='ArrowRight'){e.preventDefault();setSelD(fmt(addDays(sd,1)));}if(e.key===(settings.shortcut||'n')&&!e.metaKey&&!e.ctrlKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'&&document.activeElement?.tagName!=='SELECT'){e.preventDefault();setETask(null);setACat('thing');setMOpen(true);}}window.addEventListener('keydown',onK);return()=>window.removeEventListener('keydown',onK);},[mOpen,sOpen,selD,settings.shortcut]);
 
   useEffect(()=>{if(!user)return;async function ld(){
     const{data:tr}=await supabase.from('tasks').select('*').eq('user_id',user.id);
     setTasks((tr||[]).map(r=>({id:r.id,title:r.title,notes:r.notes||'',project:r.project||'',category:r.category,date:r.date,recurrence:r.recurrence||{type:'none'},createdAt:r.created_at})));
     const{data:cr}=await supabase.from('completions').select('*').eq('user_id',user.id);const lc={};(cr||[]).forEach(r=>{lc[`${r.task_id}::${r.date}`]=true;});setComp(lc);
     const{data:sr}=await supabase.from('user_settings').select('*').eq('user_id',user.id).single();
-    setSettings(sr?{limits:sr.limits||DSET.limits}:DSET);setLoaded(true);
+    const rawLim=sr?.limits||{};const{_shortcut,...limOnly}=rawLim;
+    setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n'}:DSET);setLoaded(true);
   }ld();},[user,supabase]);
 
   const saveTask=useCallback(async(t)=>{setTasks(p=>{const i=p.findIndex(x=>x.id===t.id);if(i>=0){const n=[...p];n[i]=t;return n;}return[...p,t];});await supabase.from('tasks').upsert({id:t.id,user_id:user.id,title:t.title,notes:t.notes||'',project:t.project||'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});},[supabase,user]);
   const delTask=useCallback(async(id)=>{setTasks(p=>p.filter(t=>t.id!==id));setComp(p=>{const n={...p};Object.keys(n).filter(k=>k.startsWith(id+'::')).forEach(k=>delete n[k]);return n;});await supabase.from('tasks').delete().eq('id',id).eq('user_id',user.id);},[supabase,user]);
   const toggle=useCallback(async(task)=>{const k=`${task.id}::${selD}`,was=!!comp[k];setComp(p=>{const n={...p};if(was)delete n[k];else n[k]=true;return n;});if(was)await supabase.from('completions').delete().eq('user_id',user.id).eq('task_id',task.id).eq('date',selD);else await supabase.from('completions').insert({user_id:user.id,task_id:task.id,date:selD});},[supabase,user,selD,comp]);
-  const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:s.limits,updated_at:new Date().toISOString()});},[supabase,user]);
+  const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n'},updated_at:new Date().toISOString()});},[supabase,user]);
 
   // Drag-and-drop: move task to a new date
   const moveTask=useCallback(async(taskId,newDate)=>{
@@ -316,7 +322,6 @@ export default function FocusDay({supabase,user,onSignOut}){
         <div><h1 style={{margin:0,fontSize:24,fontWeight:400,fontFamily:SF,letterSpacing:'-0.01em'}}>Focus Day</h1>{fn&&<p style={{margin:'2px 0 0',fontSize:13,color:T.tm}}>{getGreeting()}, {fn}</p>}</div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <button onClick={()=>{setSelD(fmt(today));setCM(today.getMonth());setCY(today.getFullYear());setWS(startOfWeek(today));}} style={{padding:'7px 14px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.text,fontSize:12,fontWeight:600,fontFamily:F}}>Hoy</button>
-          <span style={{fontSize:10,color:T.tm,display:'flex',alignItems:'center',gap:4}}><kbd style={{padding:'1px 5px',borderRadius:3,border:`1px solid ${T.border}`,fontSize:10,fontFamily:F,background:T.surface}}>N</kbd><span>nueva</span></span>
           <button onClick={()=>setSOpen(true)} style={{background:'none',border:'none',cursor:'pointer',padding:6}}><Ic name="settings" size={18} color={T.ts}/></button>
           <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:4}}>
             {av?<img src={av} alt="" style={{width:28,height:28,borderRadius:'50%',border:`1.5px solid ${T.border}`}} referrerPolicy="no-referrer"/>:<div style={{width:28,height:28,borderRadius:'50%',background:T.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:600,color:T.ts}}>{un.charAt(0).toUpperCase()}</div>}
