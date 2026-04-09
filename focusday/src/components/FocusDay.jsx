@@ -241,10 +241,8 @@ export default function FocusDay({supabase,user,onSignOut}){
   const [loaded,setLoaded]=useState(false),[tasks,setTasks]=useState([]),[comp,setComp]=useState({}),[settings,setSettings]=useState(DSET);
   const [rightView,setRightView]=useState('week'),[today]=useState(new Date()),[selD,setSelD]=useState(fmt(new Date()));
   const [cM,setCM]=useState(new Date().getMonth()),[cY,setCY]=useState(new Date().getFullYear()),[wS,setWS]=useState(startOfWeek(new Date()));
-  const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
+  const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false);
   const allProjects=useMemo(()=>[...new Set(tasks.map(t=>t.project).filter(Boolean))].sort(),[tasks]);
-  // When showRec is off, strip recurrence so only original dates show on calendar
-  const calTasks=useMemo(()=>showRec?tasks:tasks.map(t=>({...t,recurrence:{type:'none'}})),[tasks,showRec]);
 
   useEffect(()=>{function onK(e){if(mOpen||sOpen){if(e.key==='Escape'){setMOpen(false);setSOpen(false);setETask(null);}return;}const sd=parseDate(selD);if(e.key==='ArrowLeft'){e.preventDefault();setSelD(fmt(addDays(sd,-1)));}if(e.key==='ArrowRight'){e.preventDefault();setSelD(fmt(addDays(sd,1)));}if(e.key==='n'&&!e.metaKey&&!e.ctrlKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'&&document.activeElement?.tagName!=='SELECT'){e.preventDefault();setETask(null);setACat('thing');setMOpen(true);}}window.addEventListener('keydown',onK);return()=>window.removeEventListener('keydown',onK);},[mOpen,sOpen,selD]);
 
@@ -314,17 +312,12 @@ export default function FocusDay({supabase,user,onSignOut}){
               </span>
               <button onClick={()=>rightView==='month'?navM(1):navW(1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <button onClick={()=>setShowRec(p=>!p)} title={showRec?'Ocultar recurrencias futuras':'Mostrar recurrencias futuras'} style={{display:'flex',alignItems:'center',gap:5,padding:'6px 10px',borderRadius:T.rs,border:`1.5px solid ${showRec?T.text:T.border}`,cursor:'pointer',background:showRec?T.text:'transparent',color:showRec?'#fff':T.tm,fontSize:11,fontWeight:600,fontFamily:F,transition:'all 0.2s'}}>
-                <Ic name="repeat" size={13} color={showRec?'#fff':T.tm}/>
-              </button>
-              <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
-                {['month','week'].map(v=><button key={v} onClick={()=>setRightView(v)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v?600:400,background:rightView===v?T.text:'transparent',color:rightView===v?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v==='month'?'Mes':'Semana'}</button>)}
-              </div>
+            <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
+              {['month','week'].map(v=><button key={v} onClick={()=>setRightView(v)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v?600:400,background:rightView===v?T.text:'transparent',color:rightView===v?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v==='month'?'Mes':'Semana'}</button>)}
             </div>
           </div>
-          {rightView==='month'&&<MonthView year={cY} month={cM} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={calTasks} completions={comp}/>}
-          {rightView==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={calTasks} completions={comp} onMoveTask={moveTask}/>}
+          {rightView==='month'&&<MonthView year={cY} month={cM} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={tasks} completions={comp}/>}
+          {rightView==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={tasks} completions={comp} onMoveTask={moveTask}/>}
         </div>
       </div>
 
