@@ -376,8 +376,7 @@ export default function FocusDay({supabase,user,onSignOut}){
   if(!loaded)return<div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F,color:T.tm}}><div style={{textAlign:'center'}}><div style={{fontSize:28,fontFamily:SF,color:T.text,marginBottom:8}}>Focus Day</div><div style={{fontSize:13}}>Cargando tus tareas...</div></div></div>;
 
   // Dynamic theme
-  if(settings.dark){Object.assign(T,{bg:'#0a0a0a',surface:'#161616',surfaceHover:'#1e1e1e',border:'#2a2a2a',borderLight:'#222',text:'#e7e5e4',ts:'#a8a29e',tm:'#78716c',accentSoft:'#1a1a1a',thingBg:'#1c0a0a',impBg:'#0a1628',maintBg:'#161616',okBg:'#0a1a0f'});}
-  else{Object.assign(T,{bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thingBg:'#fef2f2',impBg:'#eff6ff',maintBg:'#f5f5f4',okBg:'#f0fdf4'});}
+  if(settings.dark){Object.assign(T,{bg:'#1a1a1a',surface:'#242424',surfaceHover:'#2e2e2e',border:'#3a3a3a',borderLight:'#333',text:'#e7e5e4',ts:'#a8a29e',tm:'#78716c',accentSoft:'#2a2a2a',thingBg:'#2c1a1a',impBg:'#1a2638',maintBg:'#242424',okBg:'#1a2a1f'});}  else{Object.assign(T,{bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thingBg:'#fef2f2',impBg:'#eff6ff',maintBg:'#f5f5f4',okBg:'#f0fdf4'});}
 
   return(
     <div style={{height:'100vh',background:'transparent',fontFamily:F,color:T.text,padding:'20px 32px 24px',display:'flex',flexDirection:'column',overflow:'hidden',position:'relative',zIndex:1}}>
