@@ -200,36 +200,40 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,settings}){
 function MonthView({year,month,today,selectedDate,onSelectDate,tasks,completions}){
   const dim=getDaysInMonth(year,month),fd=getFirstDayOfMonth(year,month),cells=[];
   for(let i=0;i<fd;i++)cells.push(null);for(let d=1;d<=dim;d++)cells.push(d);
-  return(<div>
+  const rows=Math.ceil(cells.length/7);
+  return(<div style={{display:'flex',flexDirection:'column',flex:1}}>
     <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>{dayNames.map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>{cells.map((day,i)=>{
+    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:`repeat(${rows},1fr)`,gap:2,flex:1}}>{cells.map((day,i)=>{
       if(!day)return<div key={`e${i}`}/>;
       const ds=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),hT=dt.some(t=>t.category==='thing'),hI=dt.some(t=>t.category==='important'),hM=dt.some(t=>t.category==='maintenance'),ad=dt.length>0&&dt.every(t=>t.completed);
-      return<button key={ds} onClick={()=>onSelectDate(ds)} style={{aspect:'1',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:isS?`2px solid ${T.text}`:isT?`2px solid ${T.tm}`:`1px solid transparent`,borderRadius:T.rs,cursor:'pointer',background:isS?T.accentSoft:'transparent',fontFamily:F,transition:'all 0.15s'}}><span style={{fontSize:14,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{day}</span>{dt.length>0&&<div style={{display:'flex',gap:2}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}</button>;
+      return<button key={ds} onClick={()=>onSelectDate(ds)} style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:isS?`2px solid ${T.text}`:isT?`2px solid ${T.tm}`:`1px solid transparent`,borderRadius:T.rs,cursor:'pointer',background:isS?T.accentSoft:'transparent',fontFamily:F,transition:'all 0.15s'}}><span style={{fontSize:14,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{day}</span>{dt.length>0&&<div style={{display:'flex',gap:2}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}</button>;
     })}</div>
   </div>);
 }
 
 function WeekView({weekStart,today,selectedDate,onSelectDate,tasks,completions,onMoveTask}){
-  const days=Array.from({length:7},(_,i)=>addDays(weekStart,i));
+  const days=Array.from({length:21},(_,i)=>addDays(weekStart,i));
   const tr={display:'block',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'};
   const [dragOver,setDragOver]=useState(null);
-  return(<div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6}}>{days.map(d=>{
+  return(<div style={{display:'flex',flexDirection:'column',flex:1}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>{dayNames.map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'repeat(3,1fr)',gap:6,flex:1}}>{days.map(d=>{
     const ds=fmt(d),isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),tt=dt.find(t=>t.category==='thing'),im=dt.filter(t=>t.category==='important'),ma=dt.filter(t=>t.category==='maintenance'),hT=!!tt,hI=im.length>0,hM=ma.length>0,ad=dt.length>0&&dt.every(t=>t.completed);
     return<div key={ds} onClick={()=>onSelectDate(ds)}
       onDragOver={e=>{e.preventDefault();setDragOver(ds);}}
       onDragLeave={()=>setDragOver(null)}
       onDrop={e=>{e.preventDefault();setDragOver(null);const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
-      style={{padding:'12px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isS?`2px solid ${T.text}`:dragOver===ds?`2px dashed ${T.imp}`:isT?`2px solid ${T.tm}`:`1px solid ${T.borderLight}`,background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,minHeight:180,transition:'all 0.15s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.04em'}}>{dayNames[d.getDay()]}</span><span style={{fontSize:16,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div>
+      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isS?`2px solid ${T.text}`:dragOver===ds?`2px dashed ${T.imp}`:isT?`2px solid ${T.tm}`:`1px solid ${T.borderLight}`,background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.15s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,minHeight:0}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><span style={{fontSize:10,color:T.tm}}>{monthNames[d.getMonth()].slice(0,3)}</span><span style={{fontSize:15,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div>
       <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
         {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:11,padding:'3px 6px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
         {im.slice(0,3).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
         {ma.slice(0,2).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
       </div>
-      {dt.length>0&&<div style={{display:'flex',gap:3,paddingTop:6,justifyContent:'center'}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}
+      {dt.length>0&&<div style={{display:'flex',gap:3,paddingTop:4,justifyContent:'center'}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}
     </div>;
-  })}</div>);
+  })}</div>
+  </div>);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -262,7 +266,7 @@ export default function FocusDay({supabase,user,onSignOut}){
   },[supabase,user]);
 
   const navM=(dir)=>{let m=cM+dir,y=cY;if(m>11){m=0;y++;}else if(m<0){m=11;y--;}setCM(m);setCY(y);};
-  const navW=(dir)=>setWS(p=>addDays(p,dir*7));
+  const navW=(dir)=>setWS(p=>addDays(p,dir*21));
 
   const sd=parseDate(selD);
   const av=user?.user_metadata?.avatar_url,un=user?.user_metadata?.full_name||user?.email||'',fn=(user?.user_metadata?.full_name||'').split(' ')[0]||'';
@@ -270,7 +274,7 @@ export default function FocusDay({supabase,user,onSignOut}){
   if(!loaded)return<div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F,color:T.tm}}><div style={{textAlign:'center'}}><div style={{fontSize:28,fontFamily:SF,color:T.text,marginBottom:8}}>Focus Day</div><div style={{fontSize:13}}>Cargando tus tareas...</div></div></div>;
 
   return(
-    <div style={{minHeight:'100vh',background:T.bg,fontFamily:F,color:T.text,padding:'20px 32px 40px',display:'flex',flexDirection:'column'}}>
+    <div style={{height:'100vh',background:T.bg,fontFamily:F,color:T.text,padding:'20px 32px 24px',display:'flex',flexDirection:'column',overflow:'hidden'}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
         <div><h1 style={{margin:0,fontSize:24,fontWeight:400,fontFamily:SF,letterSpacing:'-0.01em'}}>Focus Day</h1>{fn&&<p style={{margin:'2px 0 0',fontSize:13,color:T.tm}}>{getGreeting()}, {fn}</p>}</div>
@@ -288,7 +292,7 @@ export default function FocusDay({supabase,user,onSignOut}){
       {/* Split layout: Left = DayView, Right = Month/Week */}
       <div style={{display:'grid',gridTemplateColumns:'340px 1fr',gap:32,flex:1,minHeight:0}}>
         {/* LEFT: Day View (always visible) */}
-        <div style={{position:'sticky',top:20,alignSelf:'start'}}>
+        <div style={{overflowY:'auto',paddingRight:8}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
             <button onClick={()=>setSelD(fmt(addDays(sd,-1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={16}/></button>
             <span style={{fontSize:14,fontWeight:600,fontFamily:F}}>{sd.getDate()} {monthNames[sd.getMonth()]} {sd.getFullYear()}</span>
@@ -299,12 +303,12 @@ export default function FocusDay({supabase,user,onSignOut}){
         </div>
 
         {/* RIGHT: Calendar panel */}
-        <div>
+        <div style={{display:'flex',flexDirection:'column',minHeight:0}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:4}}>
               <button onClick={()=>rightView==='month'?navM(-1):navW(-1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={18}/></button>
               <span style={{fontSize:15,fontWeight:600,minWidth:160,textAlign:'center',fontFamily:F}}>
-                {rightView==='month'?`${monthNames[cM]} ${cY}`:`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,6).getDate()} ${monthNames[addDays(wS,6).getMonth()].slice(0,3)}`}
+                {rightView==='month'?`${monthNames[cM]} ${cY}`:`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,20).getDate()} ${monthNames[addDays(wS,20).getMonth()].slice(0,3)}`}
               </span>
               <button onClick={()=>rightView==='month'?navM(1):navW(1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button>
             </div>
