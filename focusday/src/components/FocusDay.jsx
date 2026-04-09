@@ -290,7 +290,7 @@ export default function FocusDay({supabase,user,onSignOut}){
   if(!loaded)return<div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F,color:T.tm}}><div style={{textAlign:'center'}}><div style={{fontSize:28,fontFamily:SF,color:T.text,marginBottom:8}}>Focus Day</div><div style={{fontSize:13}}>Cargando tus tareas...</div></div></div>;
 
   return(
-    <div style={{height:'100vh',background:'transparent',fontFamily:F,color:T.text,padding:'20px 32px 24px',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+    <div style={{height:'100vh',background:'transparent',fontFamily:F,color:T.text,padding:'20px 32px 24px',display:'flex',flexDirection:'column',overflow:'hidden',position:'relative',zIndex:1}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
         <div><h1 style={{margin:0,fontSize:24,fontWeight:400,fontFamily:SF,letterSpacing:'-0.01em'}}>Focus Day</h1>{fn&&<p style={{margin:'2px 0 0',fontSize:13,color:T.tm}}>{getGreeting()}, {fn}</p>}</div>
