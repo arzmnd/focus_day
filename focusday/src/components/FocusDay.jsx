@@ -60,6 +60,13 @@ function PPill({name}){if(!name)return null;const c=pColor(name);return <span st
 
 function PRing({pct,size=44}){const sw=3.5,r=(size-sw)/2,ci=2*Math.PI*r,off=ci-(pct/100)*ci,dn=pct===100;return<div style={{position:'relative',width:size,height:size}}><svg width={size} height={size} style={{transform:'rotate(-90deg)'}}><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={T.border} strokeWidth={sw}/><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={dn?T.ok:T.text} strokeWidth={sw} strokeDasharray={ci} strokeDashoffset={off} strokeLinecap="round" style={{transition:'stroke-dashoffset 0.5s ease'}}/></svg><span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:dn?T.ok:T.text,fontFamily:F}}>{pct}%</span></div>;}
 
+function Toggle({on,onToggle,label}){return<div onClick={onToggle} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',userSelect:'none'}}>
+  <div style={{width:36,height:20,borderRadius:10,background:on?T.text:T.border,transition:'background 0.2s',position:'relative',flexShrink:0}}>
+    <div style={{width:16,height:16,borderRadius:8,background:'#fff',position:'absolute',top:2,left:on?18:2,transition:'left 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.15)'}}/>
+  </div>
+  {label&&<span style={{fontSize:11,color:on?T.text:T.tm,fontFamily:F,fontWeight:500}}>{label}</span>}
+</div>;}
+
 // ─── Task Modal ────────────────────────────────────────────────────
 function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat,tasks,completions,settings,allTags}){
   const [title,setTitle]=useState('');
@@ -257,8 +264,21 @@ export default function FocusDay({supabase,user,onSignOut}){
   const [cM,setCM]=useState(new Date().getMonth()),[cY,setCY]=useState(new Date().getFullYear()),[wS,setWS]=useState(startOfWeek(new Date()));
   const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
   const allTags=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.project){try{const a=JSON.parse(t.project);if(Array.isArray(a))a.forEach(x=>s.add(x));else if(t.project)s.add(t.project);}catch{s.add(t.project);}}});return[...s].sort();},[tasks]);
-  // When showRec is off, strip recurrence so only original dates show on calendar
-  const calTasks=useMemo(()=>showRec?tasks:tasks.map(t=>({...t,recurrence:{type:'none'}})),[tasks,showRec]);
+  // When showRec is off, show only the next uncompleted occurrence per recurring task
+  const calTasks=useMemo(()=>{
+    if(showRec)return tasks;
+    return tasks.map(t=>{
+      if(!t.recurrence||t.recurrence.type==='none')return t;
+      const now=new Date();
+      for(let i=0;i<365;i++){
+        const d=addDays(now,i),ds=fmt(d);
+        if(shouldTaskAppear(t,ds)&&!comp[`${t.id}::${ds}`]){
+          return{...t,date:ds,recurrence:{type:'none'}};
+        }
+      }
+      return{...t,recurrence:{type:'none'}};
+    });
+  },[tasks,showRec,comp]);
 
   useEffect(()=>{function onK(e){if(mOpen||sOpen){if(e.key==='Escape'){setMOpen(false);setSOpen(false);setETask(null);}return;}const sd=parseDate(selD);if(e.key==='ArrowLeft'){e.preventDefault();setSelD(fmt(addDays(sd,-1)));}if(e.key==='ArrowRight'){e.preventDefault();setSelD(fmt(addDays(sd,1)));}if(e.key==='n'&&!e.metaKey&&!e.ctrlKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'&&document.activeElement?.tagName!=='SELECT'){e.preventDefault();setETask(null);setACat('thing');setMOpen(true);}}window.addEventListener('keydown',onK);return()=>window.removeEventListener('keydown',onK);},[mOpen,sOpen,selD]);
 
@@ -329,9 +349,7 @@ export default function FocusDay({supabase,user,onSignOut}){
               <button onClick={()=>rightView==='month'?navM(1):navW(1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <button onClick={()=>setShowRec(p=>!p)} title={showRec?'Ocultar recurrencias futuras':'Mostrar recurrencias futuras'} style={{display:'flex',alignItems:'center',gap:5,padding:'6px 10px',borderRadius:T.rs,border:`1.5px solid ${showRec?T.text:T.border}`,cursor:'pointer',background:showRec?T.text:'transparent',color:showRec?'#fff':T.tm,fontSize:11,fontWeight:600,fontFamily:F,transition:'all 0.2s'}}>
-                <Ic name="repeat" size={13} color={showRec?'#fff':T.tm}/>
-              </button>
+              <Toggle on={showRec} onToggle={()=>setShowRec(p=>!p)} label={showRec?'Todas':'Próxima'}/>
               <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
                 {['month','week'].map(v=><button key={v} onClick={()=>setRightView(v)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v?600:400,background:rightView===v?T.text:'transparent',color:rightView===v?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v==='month'?'Mes':'Semana'}</button>)}
               </div>
