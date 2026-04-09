@@ -61,11 +61,12 @@ function PPill({name}){if(!name)return null;const c=pColor(name);return <span st
 function PRing({pct,size=44}){const sw=3.5,r=(size-sw)/2,ci=2*Math.PI*r,off=ci-(pct/100)*ci,dn=pct===100;return<div style={{position:'relative',width:size,height:size}}><svg width={size} height={size} style={{transform:'rotate(-90deg)'}}><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={T.border} strokeWidth={sw}/><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={dn?T.ok:T.text} strokeWidth={sw} strokeDasharray={ci} strokeDashoffset={off} strokeLinecap="round" style={{transition:'stroke-dashoffset 0.5s ease'}}/></svg><span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:dn?T.ok:T.text,fontFamily:F}}>{pct}%</span></div>;}
 
 // ─── Task Modal ────────────────────────────────────────────────────
-function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat,tasks,completions,settings,allProjects}){
+function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat,tasks,completions,settings,allTags}){
   const [title,setTitle]=useState('');
   const [notes,setNotes]=useState('');
-  const [project,setProject]=useState('');
-  const [showPS,setShowPS]=useState(false);
+  const [tags,setTags]=useState([]);
+  const [tagInput,setTagInput]=useState('');
+  const [showTS,setShowTS]=useState(false);
   const [category,setCat]=useState('thing');
   const [date,setDate]=useState(dateStr);
   const [recP,setRecP]=useState('none');
@@ -75,16 +76,20 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
   const iRef=useRef(null);
   function r2p(r){if(!r||r.type==='none')return'none';if(r.type==='weekdays'){const d=(r.days||[]).sort().join(',');if(d==='1,2,3,4,5')return'weekdays';if(d==='0,6')return'weekends';return'specific_days';}if(r.type==='daily'&&(r.interval||1)===1)return'every_day';if(r.type==='weekly'&&(r.interval||1)===1)return'every_week';if(r.type==='weekly'&&(r.interval||1)===2)return'every_2_weeks';if(r.type==='monthly'){const i=r.interval||1;if(i===1)return'every_month';if(i===3)return'every_3_months';if(i===6)return'every_6_months';if(i===12)return'every_year';}return'custom';}
   function r2f(r){if(!r)return'daily';if(r.type==='daily')return'daily';if(r.type==='weekly')return'weekly';if(r.type==='monthly'&&(r.interval||1)>=12)return'yearly';if(r.type==='monthly')return'monthly';return'daily';}
-  useEffect(()=>{if(isOpen){setTitle(task?.title||'');setNotes(task?.notes||'');setProject(task?.project||'');setCat(task?.category||initCat||'thing');setDate(task?.date||dateStr);const r=task?.recurrence||{type:'none'};setRecP(r2p(r));setRecF(r2f(r));setRecI(r.interval||1);setRecD(r.days||[]);setShowPS(false);setTimeout(()=>iRef.current?.focus(),100);}},[isOpen,task,dateStr,initCat]);
+  useEffect(()=>{if(isOpen){setTitle(task?.title||'');setNotes(task?.notes||'');
+    try{setTags(JSON.parse(task?.project||'[]'));}catch{setTags(task?.project?[task.project]:[]);}
+    setTagInput('');setCat(task?.category||initCat||'thing');setDate(task?.date||dateStr);const r=task?.recurrence||{type:'none'};setRecP(r2p(r));setRecF(r2f(r));setRecI(r.interval||1);setRecD(r.days||[]);setShowTS(false);setTimeout(()=>iRef.current?.focus(),100);}},[isOpen,task,dateStr,initCat]);
   if(!isOpen)return null;
-  const fps=allProjects.filter(p=>p.toLowerCase().includes(project.toLowerCase())&&p!==project);
+  const fts=allTags.filter(t=>!tags.includes(t)&&t.toLowerCase().includes(tagInput.toLowerCase()));
+  const addTag=(t)=>{if(t&&!tags.includes(t))setTags(p=>[...p,t]);setTagInput('');};
+  const removeTag=(t)=>setTags(p=>p.filter(x=>x!==t));
   const save=()=>{
     if(!title.trim())return;
     const c=category,lim=settings.limits[c];
     if(!task){const ex=tasksFor(tasks,date,completions).filter(t=>t.category===c);if(ex.length>=lim){alert(`Límite de ${lim} alcanzado para "${CAT[c].label}". Programa para otro día.`);return;}}
     let rec={type:'none'};
     if(recP==='every_day')rec={type:'daily',interval:1};else if(recP==='weekdays')rec={type:'weekdays',days:[1,2,3,4,5]};else if(recP==='weekends')rec={type:'weekdays',days:[0,6]};else if(recP==='every_week')rec={type:'weekly',interval:1};else if(recP==='every_2_weeks')rec={type:'weekly',interval:2};else if(recP==='every_month')rec={type:'monthly',interval:1};else if(recP==='every_3_months')rec={type:'monthly',interval:3};else if(recP==='every_6_months')rec={type:'monthly',interval:6};else if(recP==='every_year')rec={type:'monthly',interval:12};else if(recP==='specific_days')rec={type:'weekdays',days:recD};else if(recP==='custom'){if(recF==='daily')rec={type:'daily',interval:recI};else if(recF==='weekly')rec={type:'weekly',interval:recI};else if(recF==='monthly')rec={type:'monthly',interval:recI};else if(recF==='yearly')rec={type:'monthly',interval:recI*12};}
-    onSave({id:task?.id||uid(),title:title.trim(),notes:notes.trim(),project:project.trim(),category:c,date,recurrence:rec,createdAt:task?.createdAt||Date.now()});onClose();
+    onSave({id:task?.id||uid(),title:title.trim(),notes:notes.trim(),project:JSON.stringify(tags),category:c,date,recurrence:rec,createdAt:task?.createdAt||Date.now()});onClose();
   };
   const togD=(d)=>setRecD(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d].sort());
   const IS={width:'100%',boxSizing:'border-box',padding:'10px 14px',fontSize:14,fontFamily:F,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',transition:'border-color 0.2s'};
@@ -102,13 +107,22 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
           <div style={{display:'flex',gap:8,marginTop:16}}>
             {Object.entries(CAT).map(([k,m])=><button key={k} onClick={()=>setCat(k)} style={{flex:1,padding:'10px 8px',borderRadius:T.rs,cursor:'pointer',border:`1.5px solid ${category===k?m.color:T.border}`,background:category===k?m.bg:'transparent',color:category===k?m.color:T.ts,fontSize:12,fontWeight:600,fontFamily:F,transition:'all 0.2s',letterSpacing:'0.02em',textTransform:'uppercase'}}>{m.label}</button>)}
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:16}}>
-            <div style={{position:'relative'}}>
-              <label style={LS}>Proyecto</label>
-              <input value={project} onChange={e=>{setProject(e.target.value);setShowPS(true);}} onFocus={()=>setShowPS(true)} onBlur={()=>setTimeout(()=>setShowPS(false),150)} placeholder="Opcional" style={IS}/>
-              {showPS&&fps.length>0&&<div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:10,marginTop:2,background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.rs,boxShadow:'0 8px 24px rgba(0,0,0,0.1)',maxHeight:120,overflow:'auto'}}>{fps.map(p=><button key={p} onMouseDown={()=>{setProject(p);setShowPS(false);}} style={{display:'flex',alignItems:'center',gap:6,width:'100%',padding:'8px 12px',border:'none',background:'transparent',cursor:'pointer',fontSize:13,color:T.text,fontFamily:F,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background='transparent'}><PPill name={p}/></button>)}</div>}
-            </div>
-            <div><label style={LS}>Fecha</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={IS}/></div>
+          <div style={{marginTop:16}}>
+            <label style={LS}>Fecha</label>
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={IS}/>
+          </div>
+          <div style={{marginTop:16,position:'relative'}}>
+            <label style={LS}>Tags</label>
+            {tags.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:8}}>
+              {tags.map(t=>{const c=pColor(t);return<span key={t} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 8px 3px 10px',borderRadius:20,background:c.bg,color:c.text,border:`1px solid ${c.border}`,fontSize:12,fontWeight:500,fontFamily:F}}>{t}<button onClick={()=>removeTag(t)} style={{background:'none',border:'none',cursor:'pointer',padding:0,display:'flex',alignItems:'center',opacity:0.5,transition:'opacity 0.15s'}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}><Ic name="x" size={12} color={c.text}/></button></span>;})}
+            </div>}
+            <input value={tagInput} onChange={e=>{setTagInput(e.target.value);setShowTS(true);}} onFocus={()=>setShowTS(true)} onBlur={()=>setTimeout(()=>setShowTS(false),150)}
+              onKeyDown={e=>{if(e.key==='Enter'&&tagInput.trim()){e.preventDefault();addTag(tagInput.trim());}}}
+              placeholder={tags.length?'Agregar otro tag...':'Buscar o crear tag...'} style={IS}/>
+            {showTS&&(fts.length>0||tagInput.trim())&&<div style={{position:'absolute',left:0,right:0,zIndex:10,marginTop:2,background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.rs,boxShadow:'0 8px 24px rgba(0,0,0,0.1)',maxHeight:150,overflow:'auto'}}>
+              {fts.map(t=><button key={t} onMouseDown={()=>addTag(t)} style={{display:'flex',alignItems:'center',gap:6,width:'100%',padding:'8px 12px',border:'none',background:'transparent',cursor:'pointer',fontSize:13,color:T.text,fontFamily:F,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background='transparent'}><PPill name={t}/></button>)}
+              {tagInput.trim()&&!allTags.includes(tagInput.trim())&&!tags.includes(tagInput.trim())&&<button onMouseDown={()=>addTag(tagInput.trim())} style={{display:'flex',alignItems:'center',gap:6,width:'100%',padding:'8px 12px',border:'none',background:'transparent',cursor:'pointer',fontSize:13,color:T.imp,fontFamily:F,textAlign:'left',fontWeight:500}} onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>+ Crear "{tagInput.trim()}"</button>}
+            </div>}
           </div>
           <div style={{marginTop:16}}><label style={LS}>Notas</label><textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Contexto, links, detalles..." rows={3} style={{...IS,resize:'vertical',lineHeight:1.5,minHeight:64}}/></div>
           <div style={{marginTop:16}}>
@@ -156,7 +170,7 @@ function TaskItem({task,onToggle,onEdit}){
       <div style={{flex:1,minWidth:0}} onClick={onEdit}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontSize:14,color:task.completed?T.tm:T.text,textDecoration:task.completed?'line-through':'none',fontFamily:F,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{task.title}</span>
-          {task.project&&<PPill name={task.project}/>}
+          {task.project&&(()=>{try{const tgs=JSON.parse(task.project);return Array.isArray(tgs)?tgs.map(t=><PPill key={t} name={t}/>):<PPill name={task.project}/>;}catch{return<PPill name={task.project}/>;}})()}
         </div>
       </div>
       {task.recurrence?.type&&task.recurrence.type!=='none'&&<Ic name="repeat" size={14}/>}
@@ -241,8 +255,10 @@ export default function FocusDay({supabase,user,onSignOut}){
   const [loaded,setLoaded]=useState(false),[tasks,setTasks]=useState([]),[comp,setComp]=useState({}),[settings,setSettings]=useState(DSET);
   const [rightView,setRightView]=useState('week'),[today]=useState(new Date()),[selD,setSelD]=useState(fmt(new Date()));
   const [cM,setCM]=useState(new Date().getMonth()),[cY,setCY]=useState(new Date().getFullYear()),[wS,setWS]=useState(startOfWeek(new Date()));
-  const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false);
-  const allProjects=useMemo(()=>[...new Set(tasks.map(t=>t.project).filter(Boolean))].sort(),[tasks]);
+  const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
+  const allTags=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.project){try{const a=JSON.parse(t.project);if(Array.isArray(a))a.forEach(x=>s.add(x));else if(t.project)s.add(t.project);}catch{s.add(t.project);}}});return[...s].sort();},[tasks]);
+  // When showRec is off, strip recurrence so only original dates show on calendar
+  const calTasks=useMemo(()=>showRec?tasks:tasks.map(t=>({...t,recurrence:{type:'none'}})),[tasks,showRec]);
 
   useEffect(()=>{function onK(e){if(mOpen||sOpen){if(e.key==='Escape'){setMOpen(false);setSOpen(false);setETask(null);}return;}const sd=parseDate(selD);if(e.key==='ArrowLeft'){e.preventDefault();setSelD(fmt(addDays(sd,-1)));}if(e.key==='ArrowRight'){e.preventDefault();setSelD(fmt(addDays(sd,1)));}if(e.key==='n'&&!e.metaKey&&!e.ctrlKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'&&document.activeElement?.tagName!=='SELECT'){e.preventDefault();setETask(null);setACat('thing');setMOpen(true);}}window.addEventListener('keydown',onK);return()=>window.removeEventListener('keydown',onK);},[mOpen,sOpen,selD]);
 
@@ -312,16 +328,21 @@ export default function FocusDay({supabase,user,onSignOut}){
               </span>
               <button onClick={()=>rightView==='month'?navM(1):navW(1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button>
             </div>
-            <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
-              {['month','week'].map(v=><button key={v} onClick={()=>setRightView(v)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v?600:400,background:rightView===v?T.text:'transparent',color:rightView===v?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v==='month'?'Mes':'Semana'}</button>)}
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <button onClick={()=>setShowRec(p=>!p)} title={showRec?'Ocultar recurrencias futuras':'Mostrar recurrencias futuras'} style={{display:'flex',alignItems:'center',gap:5,padding:'6px 10px',borderRadius:T.rs,border:`1.5px solid ${showRec?T.text:T.border}`,cursor:'pointer',background:showRec?T.text:'transparent',color:showRec?'#fff':T.tm,fontSize:11,fontWeight:600,fontFamily:F,transition:'all 0.2s'}}>
+                <Ic name="repeat" size={13} color={showRec?'#fff':T.tm}/>
+              </button>
+              <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
+                {['month','week'].map(v=><button key={v} onClick={()=>setRightView(v)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v?600:400,background:rightView===v?T.text:'transparent',color:rightView===v?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v==='month'?'Mes':'Semana'}</button>)}
+              </div>
             </div>
           </div>
-          {rightView==='month'&&<MonthView year={cY} month={cM} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={tasks} completions={comp}/>}
-          {rightView==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={tasks} completions={comp} onMoveTask={moveTask}/>}
+          {rightView==='month'&&<MonthView year={cY} month={cM} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={calTasks} completions={comp}/>}
+          {rightView==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} tasks={calTasks} completions={comp} onMoveTask={moveTask}/>}
         </div>
       </div>
 
-      <TaskModal isOpen={mOpen} onClose={()=>{setMOpen(false);setETask(null);}} onSave={saveTask} onDelete={delTask} task={eTask} dateStr={selD} category={aCat} tasks={tasks} completions={comp} settings={settings} allProjects={allProjects}/>
+      <TaskModal isOpen={mOpen} onClose={()=>{setMOpen(false);setETask(null);}} onSave={saveTask} onDelete={delTask} task={eTask} dateStr={selD} category={aCat} tasks={tasks} completions={comp} settings={settings} allTags={allTags}/>
       <SettingsModal isOpen={sOpen} onClose={()=>setSOpen(false)} settings={settings} onSave={saveSets}/>
     </div>
   );
