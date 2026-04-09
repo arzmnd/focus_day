@@ -9,7 +9,35 @@
 html, body {
   height: 100%;
   font-family: 'DM Sans', sans-serif;
-  background: #fafaf9;
   color: #1c1917;
   -webkit-font-smoothing: antialiased;
+  background: #fafaf9;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: 
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(220, 210, 195, 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 85% 75%, rgba(191, 219, 254, 0.2) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 50% 50%, rgba(254, 243, 199, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 70% at 90% 15%, rgba(221, 214, 254, 0.15) 0%, transparent 50%);
+  animation: bgDrift 25s ease-in-out infinite alternate;
+}
+
+@keyframes bgDrift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-20px, 15px) scale(1.02);
+  }
+  66% {
+    transform: translate(15px, -10px) scale(0.98);
+  }
+  100% {
+    transform: translate(-10px, -20px) scale(1.01);
+  }
 }
