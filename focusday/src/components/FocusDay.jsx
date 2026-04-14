@@ -271,7 +271,6 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onC
       {tot>0&&<PRing pct={pct}/>}
     </div>
     {['thing','important','maintenance'].map(c=><CatSection key={c} category={c} tasks={dt.filter(t=>t.category===c)} onToggle={onToggle} onEdit={onEdit} onAdd={()=>onAdd(c)} onQuickAdd={onQuickAdd} onCatChange={onCatChange} limit={settings.limits[c]} dateStr={dateStr}/>)}
-    <Heatmap tasks={tasks} completions={completions}/>
   </div>);
 }
 
