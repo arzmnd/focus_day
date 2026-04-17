@@ -27,8 +27,9 @@ function shouldTaskAppear(task, dateStr) {
   if (rec.type==='weekdays') return (rec.days||[]).includes(cd.getDay());
   return task.date === dateStr;
 }
+const BL_DATE='1970-01-01';
 function tasksFor(tasks, ds, comp) {
-  return tasks.filter(t=>shouldTaskAppear(t,ds)).map(t=>({...t,completed:!!(comp[`${t.id}::${ds}`])}));
+  return tasks.filter(t=>t.date!==BL_DATE&&shouldTaskAppear(t,ds)).map(t=>({...t,completed:!!(comp[`${t.id}::${ds}`])}));
 }
 
 const T={bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thing:'#dc2626',thingBg:'#fef2f2',imp:'#2563eb',impBg:'#eff6ff',maint:'#78716c',maintBg:'#f5f5f4',ok:'#16a34a',okBg:'#f0fdf4',r:'10px',rs:'6px',rl:'14px'};
@@ -51,12 +52,13 @@ function Ic({name,size=18,color:C,style:s}){
     note:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round"/><polyline points="14 2 14 8 20 8" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round"/></>,
     focus:<><circle cx="12" cy="12" r="10" stroke={C||T.thing} strokeWidth="1.8" fill="none"/><polygon points="10 8 16 12 10 16" fill={C||T.thing}/></>,
     pause:<><rect x="6" y="4" width="4" height="16" rx="1" fill={C||T.text}/><rect x="14" y="4" width="4" height="16" rx="1" fill={C||T.text}/></>,
+    inbox:<><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round"/></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" style={{flexShrink:0,...s}}>{m[name]}</svg>;
 }
 
 const CAT={thing:{label:'The Thing',color:T.thing,bg:T.thingBg,icon:'target',desc:'Tu prioridad #1'},important:{label:'Important',color:T.imp,bg:T.impBg,icon:'star',desc:'Tareas clave'},maintenance:{label:'Maintenance',color:T.maint,bg:T.maintBg,icon:'settings',desc:'Bajo esfuerzo'}};
-const DSET={limits:{thing:1,important:3,maintenance:99},shortcut:'n',dark:false,workWeek:false};
+const DSET={limits:{thing:1,important:3,maintenance:99},shortcut:'n',dark:false,workWeek:false,onboarded:false};
 
 function PPill({name}){if(!name)return null;const c=pColor(name);return <span style={{display:'inline-flex',padding:'1px 6px',borderRadius:20,background:c.bg,color:c.text,border:`1px solid ${c.border}`,fontSize:10,fontWeight:500,fontFamily:F,lineHeight:1.6,whiteSpace:'nowrap',flexShrink:0}}>{name}</span>;}
 
@@ -68,6 +70,54 @@ function Toggle({on,onToggle,label}){return<div onClick={onToggle} style={{displ
   </div>
   {label&&<span style={{fontSize:11,color:on?T.text:T.tm,fontFamily:F,fontWeight:500}}>{label}</span>}
 </div>;}
+
+// ─── Onboarding ───────────────────────────────────────────────────
+const OB_STEPS=[
+  {icon:'target',color:T.thing,title:'The Thing',sub:'Tu única prioridad #1 del día.',body:'Cada día, define una sola tarea que, si la completas, hace que el día valga la pena. No dos. No tres. Una.'},
+  {icon:'star',color:'#2563eb',title:'Important',sub:'3 tareas clave que importan.',body:'Después de tu Thing, elige máximo 3 tareas que realmente muevan la aguja. Todo lo demás es ruido.'},
+  {icon:'settings',color:'#78716c',title:'Maintenance',sub:'Lo demás va aquí.',body:'Correos, admin, rutina. Tareas que no requieren enfoque profundo. Hazlas en bloque, no las mezcles con lo importante.'},
+];
+
+function Onboarding({onDone,userName}){
+  const [step,setStep]=useState(0);
+  const s=OB_STEPS[step];
+  const isLast=step===OB_STEPS.length-1;
+  return(
+    <div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F,position:'relative',zIndex:1}}>
+      <div style={{maxWidth:440,width:'90vw',textAlign:'center'}}>
+        {/* Progress dots */}
+        <div style={{display:'flex',justifyContent:'center',gap:8,marginBottom:40}}>
+          {OB_STEPS.map((_,i)=><div key={i} style={{width:step===i?24:8,height:8,borderRadius:4,background:step===i?T.text:T.border,transition:'all 0.3s'}}/>)}
+        </div>
+
+        {/* Welcome on first step */}
+        {step===0&&<div style={{marginBottom:32,animation:'fadeSlideIn 0.4s ease'}}>
+          <h1 style={{fontSize:32,fontFamily:SF,fontWeight:400,color:T.text,margin:'0 0 8px'}}>Bienvenido{userName?`, ${userName}`:''}</h1>
+          <p style={{fontSize:15,color:T.ts,margin:0,lineHeight:1.6}}>Focus Day te ayuda a hacer menos, mejor.<br/>Así funciona:</p>
+        </div>}
+
+        {/* Step card */}
+        <div key={step} style={{background:T.surface,borderRadius:T.rl,padding:'40px 32px',boxShadow:'0 8px 32px rgba(0,0,0,0.06)',animation:'fadeSlideIn 0.3s ease',borderTop:`4px solid ${s.color}`}}>
+          <div style={{width:56,height:56,borderRadius:16,background:s.color+'12',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px'}}>
+            <Ic name={s.icon} size={28} color={s.color}/>
+          </div>
+          <h2 style={{fontSize:24,fontFamily:SF,fontWeight:400,color:T.text,margin:'0 0 6px'}}>{s.title}</h2>
+          <p style={{fontSize:14,fontWeight:600,color:s.color,margin:'0 0 16px'}}>{s.sub}</p>
+          <p style={{fontSize:14,color:T.ts,margin:0,lineHeight:1.7}}>{s.body}</p>
+        </div>
+
+        {/* Nav */}
+        <div style={{display:'flex',justifyContent:'center',gap:12,marginTop:28}}>
+          {step>0&&<button onClick={()=>setStep(p=>p-1)} style={{padding:'12px 28px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:14,fontWeight:500,fontFamily:F}}>Atrás</button>}
+          <button onClick={()=>{if(isLast)onDone();else setStep(p=>p+1);}} style={{padding:'12px 36px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:14,fontWeight:600,fontFamily:F,transition:'transform 0.2s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.03)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>{isLast?'Comenzar':'Siguiente'}</button>
+        </div>
+
+        {/* Skip */}
+        {!isLast&&<button onClick={onDone} style={{background:'none',border:'none',cursor:'pointer',marginTop:16,fontSize:12,color:T.tm,fontFamily:F}}>Saltar intro</button>}
+      </div>
+    </div>
+  );
+}
 
 // ─── Task Modal ────────────────────────────────────────────────────
 function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat,tasks,completions,settings,allTags}){
@@ -276,6 +326,7 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onC
       <p style={{margin:'4px 0 0',fontSize:14,color:T.tm,fontFamily:F}}>{dayNamesFull[d.getDay()]}</p>
     </div>
     {['thing','important','maintenance'].map(c=><CatSection key={c} category={c} tasks={dt.filter(t=>t.category===c)} onToggle={onToggle} onEdit={onEdit} onAdd={()=>onAdd(c)} onQuickAdd={onQuickAdd} onCatChange={onCatChange} limit={settings.limits[c]} dateStr={dateStr}/>)}
+    <Heatmap tasks={tasks} completions={completions}/>
   </div>);
 }
 
@@ -330,6 +381,49 @@ function WeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,t
     </div>;
   })}</div>
   </div>);
+}
+
+// ─── Backlog (tasks without date) ──────────────────────────────────
+function Backlog({tasks,onEdit,onMoveToDate,onQuickAdd,onDelete}){
+  const bl=tasks.filter(t=>t.date===BL_DATE);
+  const [qaOpen,setQaOpen]=useState(false),[qaVal,setQaVal]=useState(''),[dragOver,setDragOver]=useState(false);
+  const qaRef=useRef(null);
+  const doQA=()=>{if(qaVal.trim()){onQuickAdd(qaVal.trim());setQaVal('');setQaOpen(false);}};
+  return(
+    <div
+      onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+      onDragLeave={()=>setDragOver(false)}
+      onDrop={e=>{e.preventDefault();setDragOver(false);try{const d=JSON.parse(e.dataTransfer.getData('text/plain'));if(d.id)onMoveToDate(d.id,BL_DATE);}catch{const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveToDate(tid,BL_DATE);}}}
+      style={{marginTop:20,borderTop:`1px solid ${T.borderLight}`,paddingTop:16,transition:'all 0.2s'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Ic name="inbox" size={16} color={T.tm}/>
+          <span style={{fontSize:13,fontWeight:600,color:T.tm,textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:F}}>Backlog</span>
+          {bl.length>0&&<span style={{fontSize:11,color:T.tm,fontFamily:F}}>{bl.length}</span>}
+        </div>
+        <button onClick={()=>{setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}} style={{background:'none',border:'none',cursor:'pointer',padding:2,opacity:0.5,transition:'opacity 0.2s'}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}><Ic name="plus" size={15} color={T.tm}/></button>
+      </div>
+      <div style={{background:dragOver?T.impBg:T.surface,borderRadius:T.r,border:dragOver?`2px dashed ${T.imp}`:`1px dashed ${T.borderLight}`,minHeight:bl.length||qaOpen?'auto':48,overflow:'hidden',transition:'all 0.2s'}}>
+        {bl.length===0&&!qaOpen&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'14px 0',gap:6,opacity:0.3}}>
+          <Ic name="inbox" size={14} color={T.tm}/><span style={{fontSize:12,color:T.tm,fontFamily:F,fontStyle:'italic'}}>Arrastra tareas aquí o agrega nuevas</span>
+        </div>}
+        {bl.map(t=>(
+          <div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)}
+            style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',cursor:'grab',transition:'background 0.15s',borderLeft:`3px solid ${T.tm}`}}
+            onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+            <span style={{flex:1,fontSize:13,color:T.text,fontFamily:F,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.title}</span>
+            {t.project&&(()=>{try{const tgs=JSON.parse(t.project);return Array.isArray(tgs)?tgs.map(tg=><PPill key={tg} name={tg}/>):<PPill name={t.project}/>;}catch{return<PPill name={t.project}/>;}})()}
+            <button onClick={e=>{e.stopPropagation();onEdit(t);}} style={{background:'none',border:'none',cursor:'pointer',padding:2,opacity:0.4,transition:'opacity 0.15s',flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}><Ic name="edit" size={11}/></button>
+          </div>
+        ))}
+        {qaOpen&&<div style={{padding:'8px 12px',display:'flex',gap:8,alignItems:'center'}}>
+          <input ref={qaRef} value={qaVal} onChange={e=>setQaVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doQA();if(e.key==='Escape'){setQaOpen(false);setQaVal('');}}} placeholder="Nueva tarea sin fecha..." style={{flex:1,padding:'8px 10px',fontSize:13,fontFamily:F,border:`1.5px solid ${T.border}`,borderRadius:T.rs,outline:'none',background:'transparent',color:T.text}} onBlur={()=>{if(!qaVal.trim()){setQaOpen(false);setQaVal('');}}}/>
+          <button onClick={doQA} style={{background:T.text,color:'#fff',border:'none',borderRadius:T.rs,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:F,opacity:qaVal.trim()?1:0.4}}>+</button>
+        </div>}
+      </div>
+    </div>
+  );
 }
 
 // ─── Focus Mode with Pomodoro ─────────────────────────────────────
@@ -398,14 +492,14 @@ export default function FocusDay({supabase,user,onSignOut}){
     setTasks((tr||[]).map(r=>({id:r.id,title:r.title,notes:r.notes||'',project:r.project||'',category:r.category,date:r.date,recurrence:r.recurrence||{type:'none'},createdAt:r.created_at})));
     const{data:cr}=await supabase.from('completions').select('*').eq('user_id',user.id);const lc={};(cr||[]).forEach(r=>{lc[`${r.task_id}::${r.date}`]=true;});setComp(lc);
     const{data:sr}=await supabase.from('user_settings').select('*').eq('user_id',user.id).single();
-    const rawLim=sr?.limits||{};const{_shortcut,_dark,_workWeek,...limOnly}=rawLim;
-    setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n',dark:!!_dark,workWeek:!!_workWeek}:DSET);setLoaded(true);
+    const rawLim=sr?.limits||{};const{_shortcut,_dark,_workWeek,_onboarded,...limOnly}=rawLim;
+    setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n',dark:!!_dark,workWeek:!!_workWeek,onboarded:!!_onboarded}:DSET);setLoaded(true);
   }ld();},[user,supabase]);
 
   const saveTask=useCallback(async(t)=>{setTasks(p=>{const i=p.findIndex(x=>x.id===t.id);if(i>=0){const n=[...p];n[i]=t;return n;}return[...p,t];});await supabase.from('tasks').upsert({id:t.id,user_id:user.id,title:t.title,notes:t.notes||'',project:t.project||'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});},[supabase,user]);
   const delTask=useCallback(async(id)=>{setTasks(p=>p.filter(t=>t.id!==id));setComp(p=>{const n={...p};Object.keys(n).filter(k=>k.startsWith(id+'::')).forEach(k=>delete n[k]);return n;});await supabase.from('tasks').delete().eq('id',id).eq('user_id',user.id);},[supabase,user]);
   const toggle=useCallback(async(task)=>{const k=`${task.id}::${selD}`,was=!!comp[k];setComp(p=>{const n={...p};if(was)delete n[k];else n[k]=true;return n;});if(was)await supabase.from('completions').delete().eq('user_id',user.id).eq('task_id',task.id).eq('date',selD);else await supabase.from('completions').insert({user_id:user.id,task_id:task.id,date:selD});},[supabase,user,selD,comp]);
-  const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n',_dark:!!s.dark,_workWeek:!!s.workWeek},updated_at:new Date().toISOString()});},[supabase,user]);
+  const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n',_dark:!!s.dark,_workWeek:!!s.workWeek,_onboarded:!!s.onboarded},updated_at:new Date().toISOString()});},[supabase,user]);
 
   // Drag-and-drop: move task to a new date
   const moveTask=useCallback(async(taskId,newDate)=>{
@@ -426,6 +520,13 @@ export default function FocusDay({supabase,user,onSignOut}){
     await supabase.from('tasks').update({category:newCat}).eq('id',taskId).eq('user_id',user.id);
   },[supabase,user]);
 
+  // Backlog quick-add (task with date=BL_DATE)
+  const backlogAdd=useCallback(async(title)=>{
+    const t={id:uid(),title,notes:'',project:'',category:'important',date:BL_DATE,recurrence:{type:'none'},createdAt:Date.now()};
+    setTasks(p=>[...p,t]);
+    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
+  },[supabase,user]);
+
   const navM=(dir)=>{let m=cM+dir,y=cY;if(m>11){m=0;y++;}else if(m<0){m=11;y--;}setCM(m);setCY(y);};
   const navW=(dir)=>setWS(p=>addDays(p,dir*21));
 
@@ -439,6 +540,8 @@ export default function FocusDay({supabase,user,onSignOut}){
   if(settings.dark){Object.assign(T,{bg:'#1a1a1a',surface:'#242424',surfaceHover:'#2e2e2e',border:'#3a3a3a',borderLight:'#333',text:'#e7e5e4',ts:'#a8a29e',tm:'#78716c',accentSoft:'#2a2a2a',thingBg:'#2c1a1a',impBg:'#1a2638',maintBg:'#242424',okBg:'#1a2a1f'});}
   else{Object.assign(T,{bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thingBg:'#fef2f2',impBg:'#eff6ff',maintBg:'#f5f5f4',okBg:'#f0fdf4'});}
 
+  // Onboarding gate
+  if(!settings.onboarded)return<Onboarding userName={fn} onDone={()=>{const ns={...settings,onboarded:true};saveSets(ns);}}/>;
   return(
     <div style={{height:'100vh',background:'transparent',fontFamily:F,color:T.text,padding:'20px 32px 24px',display:'flex',flexDirection:'column',overflow:'hidden',position:'relative',zIndex:1}}>
       {/* Header — single condensed line */}
@@ -470,6 +573,7 @@ export default function FocusDay({supabase,user,onSignOut}){
           </div>
           <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} onQuickAdd={quickAdd} onCatChange={catChange} settings={settings}/>
           {(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return theThing?<button onClick={()=>setFocusMode(true)} style={{marginTop:16,width:'100%',padding:'10px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.thing,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'transform 0.2s',opacity:0.9}} onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.02)';e.currentTarget.style.opacity='1';}} onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.opacity='0.9';}}><Ic name="focus" size={16} color="#fff"/>Focus Mode</button>:null;})()}
+          <Backlog tasks={tasks} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onMoveToDate={moveTask} onQuickAdd={backlogAdd} onDelete={delTask}/>
         </div>
 
         {/* RIGHT: Calendar panel */}
