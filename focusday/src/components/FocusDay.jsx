@@ -7,8 +7,6 @@ const parseDate = (s) => { const [y,m,d] = s.split('-').map(Number); return new 
 const dayNames = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const dayNamesFull = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-function getDaysInMonth(y,m) { return new Date(y,m+1,0).getDate(); }
-function getFirstDayOfMonth(y,m) { return new Date(y,m,1).getDay(); }
 function addDays(d,n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
 function startOfWeek(d) { const r = new Date(d); r.setDate(r.getDate()-r.getDay()); return r; }
 function getGreeting() { const h = new Date().getHours(); return h < 12 ? 'Buenos días' : h < 18 ? 'Buenas tardes' : 'Buenas noches'; }
@@ -299,23 +297,6 @@ function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange
   </div>);
 }
 
-function Heatmap({tasks,completions}){
-  const today=new Date(),cells=[];
-  for(let i=89;i>=0;i--){const d=addDays(today,-i),ds=fmt(d),dt=tasksFor(tasks,ds,completions),tot=dt.length,done=dt.filter(t=>t.completed).length;
-    const pct=tot>0?done/tot:0;const col=tot===0?T.borderLight:pct===1?T.ok:pct>=0.5?'#86efac':pct>0?'#fde68a':T.border;
-    cells.push({ds,col,d,pct,tot});
-  }
-  return(<div style={{marginTop:16}}>
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.05em',fontFamily:F,textTransform:'uppercase'}}>Últimos 90 días</span></div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(13,1fr)',gap:3}}>{cells.map(c=><div key={c.ds} title={`${c.d.getDate()}/${c.d.getMonth()+1} — ${c.tot>0?Math.round(c.pct*100)+'%':'sin tareas'}`} style={{aspectRatio:'1',borderRadius:3,background:c.col,transition:'transform 0.15s',cursor:'default',minWidth:0}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.3)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}/>)}</div>
-    <div style={{display:'flex',gap:4,alignItems:'center',justifyContent:'flex-end',marginTop:6}}>
-      <span style={{fontSize:9,color:T.tm,fontFamily:F}}>Menos</span>
-      {[T.borderLight,T.border,'#fde68a','#86efac',T.ok].map((c,i)=><div key={i} style={{width:10,height:10,borderRadius:2,background:c}}/>)}
-      <span style={{fontSize:9,color:T.tm,fontFamily:F}}>Más</span>
-    </div>
-  </div>);
-}
-
 function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,settings}){
   const dt=useMemo(()=>tasksFor(tasks,dateStr,completions),[tasks,dateStr,completions]);
   const d=parseDate(dateStr),done=dt.filter(t=>t.completed).length,tot=dt.length,pct=tot>0?Math.round(done/tot*100):0;
@@ -329,24 +310,41 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onC
   </div>);
 }
 
-function MonthView({year,month,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions}){
-  const dim=getDaysInMonth(year,month),fd=getFirstDayOfMonth(year,month),cells=[];
-  for(let i=0;i<fd;i++)cells.push(null);for(let d=1;d<=dim;d++)cells.push(d);
-  const rows=Math.ceil(cells.length/7);
+function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions,onMoveTask,settings}){
+  const ww=settings?.workWeek;
+  const allDays=Array.from({length:7},(_,i)=>addDays(weekStart,i));
+  const days=ww?allDays.filter(d=>{const dw=d.getDay();return dw>=1&&dw<=5;}):allDays;
+  const cols=ww?5:7;
+  const maxTasks=(settings?.limits?.thing||1)+(settings?.limits?.important||3)+(settings?.limits?.maintenance||99);
+  const capLoad=Math.min(maxTasks,8);
+  const tr={display:'block',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'};
+  const [dragOver,setDragOver]=useState(null);
   return(<div style={{display:'flex',flexDirection:'column',flex:1}}>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>{dayNames.map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:`repeat(${rows},1fr)`,gap:4,flex:1}}>{cells.map((day,i)=>{
-      if(!day)return<div key={`e${i}`}/>;
-      const ds=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),hT=dt.some(t=>t.category==='thing'),hI=dt.some(t=>t.category==='important'),hM=dt.some(t=>t.category==='maintenance'),ad=dt.length>0&&dt.every(t=>t.completed);
-      return<button key={ds} onClick={()=>onSelectDate(ds)} onDoubleClick={()=>onDoubleClickDate(ds)} style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,border:'none',borderRadius:T.rs,cursor:'pointer',background:isS?T.accentSoft:'transparent',fontFamily:F,transition:'all 0.2s',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'none'}}
-        onMouseEnter={e=>{if(!isT&&!isS)e.currentTarget.style.transform='translateY(-2px)';if(!isT&&!isS)e.currentTarget.style.boxShadow='0 4px 12px rgba(0,0,0,0.06)';}}
-        onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'none';}}
-      ><span style={{fontSize:14,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{day}</span>{dt.length>0&&<div style={{display:'flex',gap:2}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}</button>;
-    })}</div>
+    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:2,marginBottom:4}}>{(ww?['Lun','Mar','Mié','Jue','Vie']:dayNames).map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
+    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:'1fr',gap:6,flex:1}}>{days.map(d=>{
+    const ds=fmt(d),isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),tt=dt.find(t=>t.category==='thing'),im=dt.filter(t=>t.category==='important'),ma=dt.filter(t=>t.category==='maintenance'),hT=!!tt,hI=im.length>0,hM=ma.length>0,ad=dt.length>0&&dt.every(t=>t.completed);
+    const load=Math.min(dt.length/capLoad,1);const loadCol=ad?T.ok:load>0.7?T.thing:load>0.4?'#f59e0b':T.imp;
+    return<div key={ds} onClick={()=>onSelectDate(ds)} onDoubleClick={()=>onDoubleClickDate(ds)}
+      onDragOver={e=>{e.preventDefault();setDragOver(ds);}}
+      onDragLeave={()=>setDragOver(null)}
+      onDrop={e=>{e.preventDefault();setDragOver(null);const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
+      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 6px 20px rgba(0,0,0,0.1)`:'0 6px 20px rgba(0,0,0,0.08)';}}
+      onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)';}}
+      style={{padding:'12px 10px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:dragOver===ds?`2px dashed ${T.imp}`:'none',background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)'}}>
+      {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'10px 10px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.04em'}}>{dayNames[d.getDay()]}</span><span style={{fontSize:18,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div>
+      <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
+        {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:12,padding:'4px 8px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
+        {im.slice(0,4).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:11,padding:'3px 8px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
+        {ma.slice(0,3).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 8px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
+      </div>
+      {dt.length>0&&<div style={{display:'flex',gap:3,paddingTop:6,justifyContent:'center'}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}
+    </div>;
+  })}</div>
   </div>);
 }
 
-function WeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions,onMoveTask,settings}){
+function PanoramaView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions,onMoveTask,settings}){
   const ww=settings?.workWeek;
   const dn=ww?['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']:dayNames;
   const allDays=Array.from({length:21},(_,i)=>addDays(weekStart,i));
@@ -462,7 +460,7 @@ function FocusMode({task,onToggle,onExit}){
 export default function FocusDay({supabase,user,onSignOut}){
   const [loaded,setLoaded]=useState(false),[tasks,setTasks]=useState([]),[comp,setComp]=useState({}),[settings,setSettings]=useState(DSET);
   const [rightView,setRightView]=useState('week'),[today]=useState(new Date()),[selD,setSelD]=useState(fmt(new Date()));
-  const [cM,setCM]=useState(new Date().getMonth()),[cY,setCY]=useState(new Date().getFullYear()),[wS,setWS]=useState(startOfWeek(new Date()));
+  const [wS,setWS]=useState(startOfWeek(new Date()));
   const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
   const [focusMode,setFocusMode]=useState(false);
   const allTags=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.project){try{const a=JSON.parse(t.project);if(Array.isArray(a))a.forEach(x=>s.add(x));else if(t.project)s.add(t.project);}catch{s.add(t.project);}}});return[...s].sort();},[tasks]);
@@ -526,8 +524,7 @@ export default function FocusDay({supabase,user,onSignOut}){
     await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
   },[supabase,user]);
 
-  const navM=(dir)=>{let m=cM+dir,y=cY;if(m>11){m=0;y++;}else if(m<0){m=11;y--;}setCM(m);setCY(y);};
-  const navW=(dir)=>setWS(p=>addDays(p,dir*21));
+  const navW=(dir)=>setWS(p=>addDays(p,dir*7));
 
   const sd=parseDate(selD);
   const hDblClick=(ds)=>{setSelD(ds);setETask(null);setACat('thing');setMOpen(true);};
@@ -552,7 +549,7 @@ export default function FocusDay({supabase,user,onSignOut}){
           {(()=>{const dt=tasksFor(tasks,selD,comp);const tC=dt.filter(t=>t.category==='thing').length;const iC=dt.filter(t=>t.category==='important').length;const mC=dt.filter(t=>t.category==='maintenance').length;return dt.length>0?<><span style={{fontSize:12,color:T.tm}}>·</span><span style={{fontSize:12,color:T.tm}}>{tC>0?`${tC} Thing`:''}{tC>0&&iC>0?' · ':''}{iC>0?`${iC} Imp`:''}{(tC>0||iC>0)&&mC>0?' · ':''}{mC>0?`${mC} Maint`:''}</span></>:null;})()}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <button onClick={()=>{setSelD(fmt(today));setCM(today.getMonth());setCY(today.getFullYear());setWS(startOfWeek(today));}} style={{padding:'6px 12px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.text,fontSize:11,fontWeight:600,fontFamily:F}}>Hoy</button>
+          <button onClick={()=>{setSelD(fmt(today));setWS(startOfWeek(today));}} style={{padding:'6px 12px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.text,fontSize:11,fontWeight:600,fontFamily:F}}>Hoy</button>
           <button onClick={()=>setSOpen(true)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="settings" size={16} color={T.ts}/></button>
           <div style={{display:'flex',alignItems:'center',gap:5,marginLeft:2}}>
             {av?<img src={av} alt="" style={{width:26,height:26,borderRadius:'50%',border:`1.5px solid ${T.border}`}} referrerPolicy="no-referrer"/>:<div style={{width:26,height:26,borderRadius:'50%',background:T.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,color:T.ts}}>{un.charAt(0).toUpperCase()}</div>}
@@ -579,20 +576,22 @@ export default function FocusDay({supabase,user,onSignOut}){
         <div style={{display:'flex',flexDirection:'column',minHeight:0}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:4}}>
-              <button onClick={()=>rightView==='month'?navM(-1):navW(-1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={18}/></button>
-              <span style={{fontSize:15,fontWeight:600,minWidth:160,textAlign:'center',fontFamily:F}}>
-                {rightView==='month'?`${monthNames[cM]} ${cY}`:`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,20).getDate()} ${monthNames[addDays(wS,20).getMonth()].slice(0,3)}`}
+              <button onClick={()=>navW(rightView==='panorama'?-3:-1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={18}/></button>
+              <span style={{fontSize:15,fontWeight:600,minWidth:180,textAlign:'center',fontFamily:F}}>
+                {rightView==='week'
+                  ?`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,6).getDate()} ${monthNames[addDays(wS,6).getMonth()].slice(0,3)}`
+                  :`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,20).getDate()} ${monthNames[addDays(wS,20).getMonth()].slice(0,3)}`}
               </span>
-              <button onClick={()=>rightView==='month'?navM(1):navW(1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button>
+              <button onClick={()=>navW(rightView==='panorama'?3:1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
-                {['month','week'].map(v=><button key={v} onClick={()=>setRightView(v)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v?600:400,background:rightView===v?T.text:'transparent',color:rightView===v?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v==='month'?'Mes':'Semana'}</button>)}
+                {[{k:'week',l:'Semana'},{k:'panorama',l:'Panorama'}].map(v=><button key={v.k} onClick={()=>setRightView(v.k)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v.k?600:400,background:rightView===v.k?T.text:'transparent',color:rightView===v.k?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v.l}</button>)}
               </div>
             </div>
           </div>
-          {rightView==='month'&&<MonthView year={cY} month={cM} today={today} selectedDate={selD} onSelectDate={setSelD} onDoubleClickDate={hDblClick} tasks={calTasks} completions={comp}/>}
-          {rightView==='week'&&<WeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} onDoubleClickDate={hDblClick} tasks={calTasks} completions={comp} onMoveTask={moveTask} settings={settings}/>}
+          {rightView==='week'&&<SingleWeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} onDoubleClickDate={hDblClick} tasks={calTasks} completions={comp} onMoveTask={moveTask} settings={settings}/>}
+          {rightView==='panorama'&&<PanoramaView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} onDoubleClickDate={hDblClick} tasks={calTasks} completions={comp} onMoveTask={moveTask} settings={settings}/>}
         </div>
       </div>
 
