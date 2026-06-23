@@ -10,6 +10,7 @@ const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Ag
 function addDays(d,n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
 function startOfWeek(d) { const r = new Date(d); r.setDate(r.getDate()-r.getDay()); return r; }
 function getGreeting() { const h = new Date().getHours(); return h < 12 ? 'Buenos días' : h < 18 ? 'Buenas tardes' : 'Buenas noches'; }
+function fmtEst(m){if(!m)return'';if(m<60)return`${m}m`;const h=Math.floor(m/60),r=m%60;return r?`${h}h ${r}m`:`${h}h`;}
 
 const PC = [{bg:'#dbeafe',text:'#1e40af',border:'#93c5fd'},{bg:'#dcfce7',text:'#166534',border:'#86efac'},{bg:'#fef3c7',text:'#92400e',border:'#fcd34d'},{bg:'#ede9fe',text:'#5b21b6',border:'#c4b5fd'},{bg:'#ffe4e6',text:'#9f1239',border:'#fda4af'},{bg:'#ccfbf1',text:'#115e59',border:'#5eead4'},{bg:'#fce7f3',text:'#9d174d',border:'#f9a8d4'},{bg:'#e0e7ff',text:'#3730a3',border:'#a5b4fc'}];
 function pColor(name) { if(!name)return null; let h=0; for(let i=0;i<name.length;i++) h=((h<<5)-h+name.charCodeAt(i))|0; return PC[Math.abs(h)%PC.length]; }
@@ -51,6 +52,7 @@ function Ic({name,size=18,color:C,style:s}){
     focus:<><circle cx="12" cy="12" r="10" stroke={C||T.thing} strokeWidth="1.8" fill="none"/><polygon points="10 8 16 12 10 16" fill={C||T.thing}/></>,
     pause:<><rect x="6" y="4" width="4" height="16" rx="1" fill={C||T.text}/><rect x="14" y="4" width="4" height="16" rx="1" fill={C||T.text}/></>,
     inbox:<><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round"/></>,
+    clock:<><circle cx="12" cy="12" r="10" stroke={C||T.tm} strokeWidth="1.8" fill="none"/><polyline points="12 6 12 12 16 14" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" style={{flexShrink:0,...s}}>{m[name]}</svg>;
 }
@@ -121,6 +123,7 @@ function Onboarding({onDone,userName}){
 function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat,tasks,completions,settings,allTags}){
   const [title,setTitle]=useState('');
   const [notes,setNotes]=useState('');
+  const [estimate,setEstimate]=useState(0);
   const [tags,setTags]=useState([]);
   const [tagInput,setTagInput]=useState('');
   const [showTS,setShowTS]=useState(false);
@@ -133,7 +136,7 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
   const iRef=useRef(null);
   function r2p(r){if(!r||r.type==='none')return'none';if(r.type==='weekdays'){const d=(r.days||[]).sort().join(',');if(d==='1,2,3,4,5')return'weekdays';if(d==='0,6')return'weekends';return'specific_days';}if(r.type==='daily'&&(r.interval||1)===1)return'every_day';if(r.type==='weekly'&&(r.interval||1)===1)return'every_week';if(r.type==='weekly'&&(r.interval||1)===2)return'every_2_weeks';if(r.type==='monthly'){const i=r.interval||1;if(i===1)return'every_month';if(i===3)return'every_3_months';if(i===6)return'every_6_months';if(i===12)return'every_year';}return'custom';}
   function r2f(r){if(!r)return'daily';if(r.type==='daily')return'daily';if(r.type==='weekly')return'weekly';if(r.type==='monthly'&&(r.interval||1)>=12)return'yearly';if(r.type==='monthly')return'monthly';return'daily';}
-  useEffect(()=>{if(isOpen){setTitle(task?.title||'');setNotes(task?.notes||'');
+  useEffect(()=>{if(isOpen){setTitle(task?.title||'');setNotes(task?.notes||'');setEstimate(task?.estimate||0);
     try{setTags(JSON.parse(task?.project||'[]'));}catch{setTags(task?.project?[task.project]:[]);}
     setTagInput('');setCat(task?.category||initCat||'thing');setDate(task?.date||dateStr);const r=task?.recurrence||{type:'none'};setRecP(r2p(r));setRecF(r2f(r));setRecI(r.interval||1);setRecD(r.days||[]);setShowTS(false);setTimeout(()=>iRef.current?.focus(),100);}},[isOpen,task,dateStr,initCat]);
   if(!isOpen)return null;
@@ -146,7 +149,7 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
     if(!task){const ex=tasksFor(tasks,date,completions).filter(t=>t.category===c);if(ex.length>=lim){alert(`Límite de ${lim} alcanzado para "${CAT[c].label}". Programa para otro día.`);return;}}
     let rec={type:'none'};
     if(recP==='every_day')rec={type:'daily',interval:1};else if(recP==='weekdays')rec={type:'weekdays',days:[1,2,3,4,5]};else if(recP==='weekends')rec={type:'weekdays',days:[0,6]};else if(recP==='every_week')rec={type:'weekly',interval:1};else if(recP==='every_2_weeks')rec={type:'weekly',interval:2};else if(recP==='every_month')rec={type:'monthly',interval:1};else if(recP==='every_3_months')rec={type:'monthly',interval:3};else if(recP==='every_6_months')rec={type:'monthly',interval:6};else if(recP==='every_year')rec={type:'monthly',interval:12};else if(recP==='specific_days')rec={type:'weekdays',days:recD};else if(recP==='custom'){if(recF==='daily')rec={type:'daily',interval:recI};else if(recF==='weekly')rec={type:'weekly',interval:recI};else if(recF==='monthly')rec={type:'monthly',interval:recI};else if(recF==='yearly')rec={type:'monthly',interval:recI*12};}
-    onSave({id:task?.id||uid(),title:title.trim(),notes:notes.trim(),project:JSON.stringify(tags),category:c,date,recurrence:rec,createdAt:task?.createdAt||Date.now()});onClose();
+    onSave({id:task?.id||uid(),title:title.trim(),notes:notes.trim(),estimate:estimate||0,project:JSON.stringify(tags),category:c,date,recurrence:rec,createdAt:task?.createdAt||Date.now()});onClose();
   };
   const togD=(d)=>setRecD(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d].sort());
   const IS={width:'100%',boxSizing:'border-box',padding:'10px 14px',fontSize:14,fontFamily:F,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',transition:'border-color 0.2s'};
@@ -167,6 +170,13 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
           <div style={{marginTop:16}}>
             <label style={LS}>Fecha</label>
             <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={IS}/>
+          </div>
+          <div style={{marginTop:16}}>
+            <label style={LS}>Tiempo estimado</label>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {[0,15,30,45,60,90,120].map(m=><button key={m} onClick={()=>setEstimate(m)} style={{padding:'7px 12px',borderRadius:20,border:`1.5px solid ${estimate===m?T.text:T.border}`,background:estimate===m?T.text:'transparent',color:estimate===m?'#fff':T.ts,fontSize:12,fontWeight:estimate===m?600:400,cursor:'pointer',fontFamily:F,transition:'all 0.2s'}}>{m===0?'—':m<60?`${m}m`:`${m/60}h`}</button>)}
+              <input type="number" min={0} max={480} value={estimate||''} onChange={e=>setEstimate(Math.max(0,+e.target.value))} placeholder="min" style={{width:60,padding:'7px 10px',fontSize:12,fontFamily:F,textAlign:'center',border:`1.5px solid ${T.border}`,borderRadius:20,color:T.text,background:T.bg,outline:'none'}}/>
+            </div>
           </div>
           <div style={{marginTop:16,position:'relative'}}>
             <label style={LS}>Tags</label>
@@ -251,6 +261,7 @@ function TaskItem({task,onToggle,onEdit,onCatDrag}){
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontSize:14,color:task.completed?T.tm:T.text,textDecoration:task.completed?'line-through':'none',fontFamily:F,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',transition:'color 0.3s'}}>{task.title}</span>
           {task.project&&(()=>{try{const tgs=JSON.parse(task.project);return Array.isArray(tgs)?tgs.map(t=><PPill key={t} name={t}/>):<PPill name={task.project}/>;}catch{return<PPill name={task.project}/>;}})()}
+          {task.estimate>0&&<span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 7px',borderRadius:20,background:T.bg,color:T.tm,fontSize:10,fontWeight:500,fontFamily:F,lineHeight:1.6,whiteSpace:'nowrap',flexShrink:0,border:`1px solid ${T.borderLight}`}}>⏱ {fmtEst(task.estimate)}</span>}
         </div>
       </div>
       {task.recurrence?.type&&task.recurrence.type!=='none'&&<Ic name="repeat" size={14}/>}
@@ -266,6 +277,7 @@ const EMPTY_SVG={thing:<svg width="28" height="28" viewBox="0 0 24 24" fill="non
 
 function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,limit,dateStr}){
   const m=CAT[category],at=tasks.length>=limit,dc=tasks.filter(t=>t.completed).length;
+  const totalEst=tasks.reduce((s,t)=>s+(t.estimate||0),0);
   const isThing=category==='thing';
   const [qaOpen,setQaOpen]=useState(false),[qaVal,setQaVal]=useState('');
   const [dragOver,setDragOver]=useState(false);
@@ -280,6 +292,7 @@ function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange
       <div style={{display:'flex',alignItems:'center',gap:8}}>
         <Ic name={m.icon} size={isThing?18:16} color={m.color}/><span style={{fontSize:isThing?14:13,fontWeight:isThing?700:600,color:m.color,textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:F}}>{m.label}</span>
         {tasks.length>0&&<span style={{fontSize:11,color:dc===tasks.length?T.ok:T.tm,fontFamily:F,fontWeight:dc===tasks.length?600:400}}>{dc}/{tasks.length}</span>}
+        {totalEst>0&&<span style={{fontSize:10,color:T.tm,fontFamily:F,display:'inline-flex',alignItems:'center',gap:2}}>· {fmtEst(totalEst)}</span>}
       </div>
       <button onClick={()=>{if(!at){setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}}} disabled={at} title={at?'Límite alcanzado':'Agregar tarea'} style={{background:'none',border:'none',cursor:at?'not-allowed':'pointer',padding:2,opacity:at?0.15:0.5,transition:'opacity 0.2s'}} onMouseEnter={e=>{if(!at)e.target.style.opacity=1}} onMouseLeave={e=>{if(!at)e.target.style.opacity=0.5}}><Ic name="plus" size={16} color={m.color}/></button>
     </div>
@@ -304,7 +317,7 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onC
     {tot>0&&<div style={{display:'flex',justifyContent:'center',marginBottom:20}}><PRing pct={pct} size={64}/></div>}
     <div style={{marginBottom:20}}>
       <h2 style={{margin:0,fontSize:36,fontWeight:400,color:T.text,fontFamily:SF,lineHeight:1.1}}>{d.getDate()} <span style={{fontSize:24,color:T.ts}}>{monthNames[d.getMonth()]}</span></h2>
-      <p style={{margin:'4px 0 0',fontSize:14,color:T.tm,fontFamily:F}}>{dayNamesFull[d.getDay()]}</p>
+      <p style={{margin:'4px 0 0',fontSize:14,color:T.tm,fontFamily:F}}>{dayNamesFull[d.getDay()]}{(()=>{const totalEst=dt.reduce((s,t)=>s+(t.estimate||0),0);return totalEst>0?<span style={{marginLeft:8,fontSize:12,color:T.ts}}>· ⏱ {fmtEst(totalEst)}</span>:null;})()}</p>
     </div>
     {['thing','important','maintenance'].map(c=><CatSection key={c} category={c} tasks={dt.filter(t=>t.category===c)} onToggle={onToggle} onEdit={onEdit} onAdd={()=>onAdd(c)} onQuickAdd={onQuickAdd} onCatChange={onCatChange} limit={settings.limits[c]} dateStr={dateStr}/>)}
   </div>);
@@ -332,7 +345,7 @@ function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClick
       onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)';}}
       style={{padding:'12px 10px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:dragOver===ds?`2px dashed ${T.imp}`:'none',background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)'}}>
       {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'10px 10px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.04em'}}>{dayNames[d.getDay()]}</span><span style={{fontSize:18,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.04em'}}>{dayNames[d.getDay()]}</span><div style={{display:'flex',alignItems:'center',gap:4}}>{(()=>{const te=dt.reduce((s,t)=>s+(t.estimate||0),0);return te>0?<span style={{fontSize:9,color:T.tm,fontFamily:F}}>⏱{fmtEst(te)}</span>:null;})()}<span style={{fontSize:18,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div></div>
       <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
         {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:12,padding:'4px 8px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
         {im.slice(0,4).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:11,padding:'3px 8px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
@@ -368,7 +381,7 @@ function PanoramaView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDa
       style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:dragOver===ds?`2px dashed ${T.imp}`:'none',background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,minHeight:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)'}}>
       {/* Load indicator bar */}
       {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'6px 6px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><span style={{fontSize:10,color:T.tm}}>{monthNames[d.getMonth()].slice(0,3)}</span><span style={{fontSize:15,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><span style={{fontSize:10,color:T.tm}}>{monthNames[d.getMonth()].slice(0,3)}</span><div style={{display:'flex',alignItems:'center',gap:3}}>{(()=>{const te=dt.reduce((s,t)=>s+(t.estimate||0),0);return te>0?<span style={{fontSize:8,color:T.tm,fontFamily:F}}>⏱{fmtEst(te)}</span>:null;})()}<span style={{fontSize:15,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div></div>
       <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
         {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:11,padding:'3px 6px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
         {im.slice(0,3).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
@@ -459,8 +472,11 @@ function FocusMode({task,onToggle,onExit}){
 // ═══════════════════════════════════════════════════════════════════
 export default function FocusDay({supabase,user,onSignOut}){
   const [loaded,setLoaded]=useState(false),[tasks,setTasks]=useState([]),[comp,setComp]=useState({}),[settings,setSettings]=useState(DSET);
-  const [rightView,setRightView]=useState('week'),[today]=useState(new Date()),[selD,setSelD]=useState(fmt(new Date()));
-  const [wS,setWS]=useState(startOfWeek(new Date()));
+  const [rightView,setRightView]=useState('week'),[today,setToday]=useState(()=>new Date()),[selD,setSelD]=useState(()=>fmt(new Date()));
+  const [wS,setWS]=useState(()=>startOfWeek(new Date()));
+
+  // Ensure dates use client timezone (Vercel SSR uses UTC)
+  useEffect(()=>{const now=new Date();setToday(now);setSelD(fmt(now));setWS(startOfWeek(now));},[]);
   const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
   const [focusMode,setFocusMode]=useState(false);
   const allTags=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.project){try{const a=JSON.parse(t.project);if(Array.isArray(a))a.forEach(x=>s.add(x));else if(t.project)s.add(t.project);}catch{s.add(t.project);}}});return[...s].sort();},[tasks]);
@@ -486,14 +502,14 @@ export default function FocusDay({supabase,user,onSignOut}){
 
   useEffect(()=>{if(!user)return;async function ld(){
     const{data:tr}=await supabase.from('tasks').select('*').eq('user_id',user.id);
-    setTasks((tr||[]).map(r=>({id:r.id,title:r.title,notes:r.notes||'',project:r.project||'',category:r.category,date:r.date,recurrence:r.recurrence||{type:'none'},createdAt:r.created_at})));
+    setTasks((tr||[]).map(r=>({id:r.id,title:r.title,notes:r.notes||'',estimate:r.estimate||0,project:r.project||'',category:r.category,date:r.date,recurrence:r.recurrence||{type:'none'},createdAt:r.created_at})));
     const{data:cr}=await supabase.from('completions').select('*').eq('user_id',user.id);const lc={};(cr||[]).forEach(r=>{lc[`${r.task_id}::${r.date}`]=true;});setComp(lc);
     const{data:sr}=await supabase.from('user_settings').select('*').eq('user_id',user.id).single();
     const rawLim=sr?.limits||{};const{_shortcut,_dark,_workWeek,_onboarded,...limOnly}=rawLim;
     setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n',dark:!!_dark,workWeek:!!_workWeek,onboarded:!!_onboarded}:DSET);setLoaded(true);
   }ld();},[user,supabase]);
 
-  const saveTask=useCallback(async(t)=>{setTasks(p=>{const i=p.findIndex(x=>x.id===t.id);if(i>=0){const n=[...p];n[i]=t;return n;}return[...p,t];});await supabase.from('tasks').upsert({id:t.id,user_id:user.id,title:t.title,notes:t.notes||'',project:t.project||'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});},[supabase,user]);
+  const saveTask=useCallback(async(t)=>{setTasks(p=>{const i=p.findIndex(x=>x.id===t.id);if(i>=0){const n=[...p];n[i]=t;return n;}return[...p,t];});await supabase.from('tasks').upsert({id:t.id,user_id:user.id,title:t.title,notes:t.notes||'',estimate:t.estimate||0,project:t.project||'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});},[supabase,user]);
   const delTask=useCallback(async(id)=>{setTasks(p=>p.filter(t=>t.id!==id));setComp(p=>{const n={...p};Object.keys(n).filter(k=>k.startsWith(id+'::')).forEach(k=>delete n[k]);return n;});await supabase.from('tasks').delete().eq('id',id).eq('user_id',user.id);},[supabase,user]);
   const toggle=useCallback(async(task)=>{const k=`${task.id}::${selD}`,was=!!comp[k];setComp(p=>{const n={...p};if(was)delete n[k];else n[k]=true;return n;});if(was)await supabase.from('completions').delete().eq('user_id',user.id).eq('task_id',task.id).eq('date',selD);else await supabase.from('completions').insert({user_id:user.id,task_id:task.id,date:selD});},[supabase,user,selD,comp]);
   const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n',_dark:!!s.dark,_workWeek:!!s.workWeek,_onboarded:!!s.onboarded},updated_at:new Date().toISOString()});},[supabase,user]);
