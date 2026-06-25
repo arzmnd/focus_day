@@ -543,6 +543,8 @@ export default function FocusDay({supabase,user,onSignOut}){
     await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
   },[supabase,user]);
 
+  const scrollRef=useRef(0);
+
   const sd=parseDate(selD);
   const hDblClick=(ds)=>{setSelD(ds);setETask(null);setACat('thing');setMOpen(true);};
   const av=user?.user_metadata?.avatar_url,un=user?.user_metadata?.full_name||user?.email||'',fn=(user?.user_metadata?.full_name||'').split(' ')[0]||'';
@@ -591,7 +593,7 @@ export default function FocusDay({supabase,user,onSignOut}){
 
         {/* RIGHT: Calendar panel — scroll to navigate */}
         <div style={{display:'flex',flexDirection:'column',minHeight:0}}
-          onWheel={e=>{e.preventDefault();const dir=e.deltaY>0?1:-1;const step=rightView==='panorama'?3:1;setWS(p=>addDays(p,dir*step*7));}}>
+          onWheel={e=>{e.preventDefault();const now=Date.now();if(now-scrollRef.current<400)return;scrollRef.current=now;const dir=e.deltaY>0?1:-1;const step=rightView==='panorama'?3:1;setWS(p=>addDays(p,dir*step*7));}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
             <span style={{fontSize:15,fontWeight:600,fontFamily:F}}>
               {rightView==='week'
