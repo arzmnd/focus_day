@@ -325,7 +325,7 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onC
 
 function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions,onMoveTask,settings}){
   const ww=settings?.workWeek;
-  const allDays=Array.from({length:7},(_,i)=>addDays(weekStart,i));
+  const allDays=Array.from({length:14},(_,i)=>addDays(weekStart,i));
   const days=ww?allDays.filter(d=>{const dw=d.getDay();return dw>=1&&dw<=5;}):allDays;
   const cols=ww?5:7;
   const maxTasks=(settings?.limits?.thing||1)+(settings?.limits?.important||3)+(settings?.limits?.maintenance||99);
@@ -334,7 +334,7 @@ function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClick
   const [dragOver,setDragOver]=useState(null);
   return(<div style={{display:'flex',flexDirection:'column',flex:1}}>
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:2,marginBottom:4}}>{(ww?['Lun','Mar','Mié','Jue','Vie']:dayNames).map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
-    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:'1fr',gap:6,flex:1}}>{days.map(d=>{
+    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:'repeat(2,1fr)',gap:6,flex:1}}>{days.map(d=>{
     const ds=fmt(d),isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),tt=dt.find(t=>t.category==='thing'),im=dt.filter(t=>t.category==='important'),ma=dt.filter(t=>t.category==='maintenance'),hT=!!tt,hI=im.length>0,hM=ma.length>0,ad=dt.length>0&&dt.every(t=>t.completed);
     const load=Math.min(dt.length/capLoad,1);const loadCol=ad?T.ok:load>0.7?T.thing:load>0.4?'#f59e0b':T.imp;
     return<div key={ds} onClick={()=>onSelectDate(ds)} onDoubleClick={()=>onDoubleClickDate(ds)}
@@ -543,8 +543,6 @@ export default function FocusDay({supabase,user,onSignOut}){
     await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
   },[supabase,user]);
 
-  const navW=(dir)=>setWS(p=>addDays(p,dir*7));
-
   const sd=parseDate(selD);
   const hDblClick=(ds)=>{setSelD(ds);setETask(null);setACat('thing');setMOpen(true);};
   const av=user?.user_metadata?.avatar_url,un=user?.user_metadata?.full_name||user?.email||'',fn=(user?.user_metadata?.full_name||'').split(' ')[0]||'';
@@ -591,18 +589,15 @@ export default function FocusDay({supabase,user,onSignOut}){
           <Backlog tasks={tasks} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onMoveToDate={moveTask} onQuickAdd={backlogAdd} onDelete={delTask}/>
         </div>
 
-        {/* RIGHT: Calendar panel */}
-        <div style={{display:'flex',flexDirection:'column',minHeight:0}}>
+        {/* RIGHT: Calendar panel — scroll to navigate */}
+        <div style={{display:'flex',flexDirection:'column',minHeight:0}}
+          onWheel={e=>{e.preventDefault();const dir=e.deltaY>0?1:-1;const step=rightView==='panorama'?3:1;setWS(p=>addDays(p,dir*step*7));}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-            <div style={{display:'flex',alignItems:'center',gap:4}}>
-              <button onClick={()=>navW(rightView==='panorama'?-3:-1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={18}/></button>
-              <span style={{fontSize:15,fontWeight:600,minWidth:180,textAlign:'center',fontFamily:F}}>
-                {rightView==='week'
-                  ?`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,6).getDate()} ${monthNames[addDays(wS,6).getMonth()].slice(0,3)}`
-                  :`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,20).getDate()} ${monthNames[addDays(wS,20).getMonth()].slice(0,3)}`}
-              </span>
-              <button onClick={()=>navW(rightView==='panorama'?3:1)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={18}/></button>
-            </div>
+            <span style={{fontSize:15,fontWeight:600,fontFamily:F}}>
+              {rightView==='week'
+                ?`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,13).getDate()} ${monthNames[addDays(wS,13).getMonth()].slice(0,3)}`
+                :`${wS.getDate()} ${monthNames[wS.getMonth()].slice(0,3)} – ${addDays(wS,20).getDate()} ${monthNames[addDays(wS,20).getMonth()].slice(0,3)}`}
+            </span>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
                 {[{k:'week',l:'Semana'},{k:'panorama',l:'Panorama'}].map(v=><button key={v.k} onClick={()=>setRightView(v.k)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v.k?600:400,background:rightView===v.k?T.text:'transparent',color:rightView===v.k?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v.l}</button>)}
