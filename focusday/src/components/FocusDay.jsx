@@ -348,8 +348,8 @@ function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClick
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.04em'}}>{dayNames[d.getDay()]}</span><div style={{display:'flex',alignItems:'center',gap:4}}>{(()=>{const te=dt.reduce((s,t)=>s+(t.estimate||0),0);return te>0?<span style={{fontSize:9,color:T.tm,fontFamily:F}}>⏱{fmtEst(te)}</span>:null;})()}<span style={{fontSize:18,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div></div>
       <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
         {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:12,padding:'4px 8px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
-        {im.slice(0,4).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:11,padding:'3px 8px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
-        {ma.slice(0,3).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 8px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
+        {im.map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:11,padding:'3px 8px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
+        {ma.map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 8px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
       </div>
       {dt.length>0&&<div style={{display:'flex',gap:3,paddingTop:6,justifyContent:'center'}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}
     </div>;
@@ -367,27 +367,30 @@ function PanoramaView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDa
   const capLoad=Math.min(maxTasks,8);
   const tr={display:'block',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'};
   const [dragOver,setDragOver]=useState(null);
+  const [expanded,setExpanded]=useState({});
+  const MAX_VIS=5;
   return(<div style={{display:'flex',flexDirection:'column',flex:1}}>
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:2,marginBottom:4}}>{dn.slice(0,cols).map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${rows},1fr)`,gap:6,flex:1}}>{days.map(d=>{
     const ds=fmt(d),isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),tt=dt.find(t=>t.category==='thing'),im=dt.filter(t=>t.category==='important'),ma=dt.filter(t=>t.category==='maintenance'),hT=!!tt,hI=im.length>0,hM=ma.length>0,ad=dt.length>0&&dt.every(t=>t.completed);
     const load=Math.min(dt.length/capLoad,1);const loadCol=ad?T.ok:load>0.7?T.thing:load>0.4?'#f59e0b':T.imp;
+    const all=[...(tt?[{...tt,_s:'t'}]:[]),...im.map(x=>({...x,_s:'i'})),...ma.map(x=>({...x,_s:'m'}))];
+    const isExp=!!expanded[ds];const vis=isExp?all:all.slice(0,MAX_VIS);const rem=all.length-MAX_VIS;
     return<div key={ds} onClick={()=>onSelectDate(ds)} onDoubleClick={()=>onDoubleClickDate(ds)}
       onDragOver={e=>{e.preventDefault();setDragOver(ds);}}
       onDragLeave={()=>setDragOver(null)}
       onDrop={e=>{e.preventDefault();setDragOver(null);const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
       onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 6px 20px rgba(0,0,0,0.1)`:'0 6px 20px rgba(0,0,0,0.08)';}}
       onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)';}}
-      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:dragOver===ds?`2px dashed ${T.imp}`:'none',background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,minHeight:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)'}}>
-      {/* Load indicator bar */}
+      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:dragOver===ds?`2px dashed ${T.imp}`:'none',background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:isExp?'visible':'hidden',minWidth:0,minHeight:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)',zIndex:isExp?10:0}}>
       {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'6px 6px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><span style={{fontSize:10,color:T.tm}}>{monthNames[d.getMonth()].slice(0,3)}</span><div style={{display:'flex',alignItems:'center',gap:3}}>{(()=>{const te=dt.reduce((s,t)=>s+(t.estimate||0),0);return te>0?<span style={{fontSize:8,color:T.tm,fontFamily:F}}>⏱{fmtEst(te)}</span>:null;})()}<span style={{fontSize:15,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div></div>
-      <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
-        {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:11,padding:'3px 6px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
-        {im.slice(0,3).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
-        {ma.slice(0,2).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
+      <div style={{flex:isExp?'none':1,display:'flex',flexDirection:'column',gap:2,minWidth:0,overflow:'hidden'}}>
+        {vis.map(t=>{const s=t._s==='t'?{fontSize:11,padding:'3px 6px',borderRadius:4,background:t.completed?T.okBg:T.thingBg,color:t.completed?T.ok:T.thing,fontWeight:500}:t._s==='i'?{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.imp}:{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.maint};return<div key={t.id} draggable onDragStart={e=>{e.stopPropagation();e.dataTransfer.setData('text/plain',t.id);}} style={{...s,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>;})}
       </div>
-      {dt.length>0&&<div style={{display:'flex',gap:3,paddingTop:4,justifyContent:'center'}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}
+      {rem>0&&!isExp&&<button onClick={e=>{e.stopPropagation();setExpanded(p=>({...p,[ds]:true}));}} style={{marginTop:4,padding:'4px 8px',borderRadius:T.rs,border:`1px solid ${T.borderLight}`,background:T.bg,cursor:'pointer',fontSize:10,fontWeight:600,color:T.ts,fontFamily:F,textAlign:'center',width:'100%',transition:'all 0.15s'}} onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background=T.bg}>+{rem} más</button>}
+      {isExp&&rem>0&&<button onClick={e=>{e.stopPropagation();setExpanded(p=>{const n={...p};delete n[ds];return n;});}} style={{marginTop:3,padding:'3px 6px',borderRadius:T.rs,border:'none',background:'transparent',cursor:'pointer',fontSize:9,color:T.tm,fontFamily:F,textAlign:'center',width:'100%'}}>Colapsar</button>}
+      {dt.length>0&&!isExp&&<div style={{display:'flex',gap:3,paddingTop:4,justifyContent:'center'}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}
     </div>;
   })}</div>
   </div>);
