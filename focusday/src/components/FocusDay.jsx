@@ -633,6 +633,7 @@ export default function FocusDay({supabase,user,onSignOut}){
   const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
   const [focusMode,setFocusMode]=useState(false);
   const [leftCollapsed,setLeftCollapsed]=useState(false);
+  const [toggleHover,setToggleHover]=useState(false);
   const allTags=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.project){try{const a=JSON.parse(t.project);if(Array.isArray(a))a.forEach(x=>s.add(x));else if(t.project)s.add(t.project);}catch{s.add(t.project);}}});return[...s].sort();},[tasks]);
   // When showRec is off, show only the next uncompleted occurrence per recurring task
   const calTasks=useMemo(()=>{
@@ -794,18 +795,29 @@ export default function FocusDay({supabase,user,onSignOut}){
           </div>
         </div>
 
-        {/* Collapse toggle — floating pill at the panel boundary */}
-        <button onClick={()=>setLeftCollapsed(p=>!p)} title={leftCollapsed?'Mostrar panel del día':'Ocultar panel del día'} style={{
-          position:'absolute',left:leftCollapsed?-4:'calc(340px - 4px)',top:6,zIndex:5,
-          width:20,height:36,borderRadius:10,border:`1px solid ${T.border}`,background:T.surface,
-          display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0,
-          boxShadow:T.sh2,transition:`left 0.3s ${T.ease}, background 0.15s ${T.ease}, box-shadow 0.15s ${T.ease}`,
-        }}
-          onMouseEnter={e=>{e.currentTarget.style.background=T.surfaceHover;e.currentTarget.style.boxShadow=T.sh3;}}
-          onMouseLeave={e=>{e.currentTarget.style.background=T.surface;e.currentTarget.style.boxShadow=T.sh2;}}
+        {/* Collapse toggle — subtle circular handle, vertically centered, discoverable on hover */}
+        <div
+          onMouseEnter={()=>setToggleHover(true)}
+          onMouseLeave={()=>setToggleHover(false)}
+          style={{
+            position:'absolute',left:leftCollapsed?-13:'calc(340px - 13px)',top:0,bottom:0,zIndex:5,
+            width:26,display:'flex',alignItems:'center',justifyContent:'center',
+            transition:`left 0.3s ${T.ease}`,cursor:'pointer',
+          }}
+          onClick={()=>setLeftCollapsed(p=>!p)}
         >
-          <Ic name={leftCollapsed?'chevRight':'chevLeft'} size={12} color={T.tm}/>
-        </button>
+          <button title={leftCollapsed?'Mostrar panel del día':'Ocultar panel del día'} tabIndex={-1} style={{
+            width:26,height:26,borderRadius:'50%',border:`1px solid ${T.border}`,
+            background:T.surface,display:'flex',alignItems:'center',justifyContent:'center',
+            cursor:'pointer',padding:0,pointerEvents:'none',
+            boxShadow:toggleHover?T.sh3:T.sh1,
+            opacity:toggleHover?1:0.55,
+            transform:toggleHover?'scale(1.08)':'scale(1)',
+            transition:`opacity 0.2s ${T.ease}, box-shadow 0.2s ${T.ease}, transform 0.2s ${T.ease}, background 0.2s ${T.ease}`,
+          }}>
+            <Ic name={leftCollapsed?'chevRight':'chevLeft'} size={12} color={T.ts}/>
+          </button>
+        </div>
 
         {/* CENTER: Calendar panel — scroll to navigate */}
         <div style={{display:'flex',flexDirection:'column',minHeight:0}}
