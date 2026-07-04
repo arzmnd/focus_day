@@ -24,8 +24,16 @@ function shouldTaskAppear(task, dateStr) {
   if (rec.type==='weekly') return dd%((rec.interval||1)*7)===0;
   if (rec.type==='monthly') { const m=(cd.getFullYear()-td.getFullYear())*12+(cd.getMonth()-td.getMonth()); return m%(rec.interval||1)===0 && cd.getDate()===td.getDate(); }
   if (rec.type==='weekdays') return (rec.days||[]).includes(cd.getDay());
+  if (rec.type==='monthday') return cd.getDate()===rec.day || (rec.day>28 && cd.getDate()===getDaysInMonthOf(cd)); // e.g. "30th" clamps on short months
+  if (rec.type==='nthweekday') {
+    if (cd.getDay()!==rec.weekday) return false;
+    const occurrence=Math.floor((cd.getDate()-1)/7)+1;
+    if (rec.nth===-1) { const lastDay=getDaysInMonthOf(cd); return cd.getDate()+7>lastDay; }
+    return occurrence===rec.nth;
+  }
   return task.date === dateStr;
 }
+function getDaysInMonthOf(d){return new Date(d.getFullYear(),d.getMonth()+1,0).getDate();}
 const BL_DATE='1970-01-01';
 function tasksFor(tasks, ds, comp) {
   return tasks.filter(t=>t.date!==BL_DATE&&shouldTaskAppear(t,ds)).map(t=>({...t,completed:!!(comp[`${t.id}::${ds}`])}));
@@ -120,7 +128,30 @@ function Onboarding({onDone,userName}){
 }
 
 // ─── Task Modal ────────────────────────────────────────────────────
-function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat,tasks,completions,settings,allTags}){
+// ─── Quick-command parser ──────────────────────────────────────────
+function parseQuickCommands(raw, existingProjects) {
+  let title = raw;
+  const tags = [];
+  let projectMatch = null;
+  let estimate = null;
+  title = title.replace(/#([\wÀ-ÿ]+)/g, (_, t) => { tags.push(t); return ''; });
+  title = title.replace(/@([\wÀ-ÿ]+)/g, (_, p) => { projectMatch = p; return ''; });
+  title = title.replace(/\b(\d+)\s?(min|m|h|hr|hrs)\b/gi, (_, n, unit) => {
+    const v = parseInt(n, 10);
+    estimate = /^h/i.test(unit) ? v * 60 : v;
+    return '';
+  });
+  title = title.replace(/\s{2,}/g, ' ').trim();
+  let projectId = null, newProjectName = null;
+  if (projectMatch) {
+    const found = existingProjects.find(p => p.name.toLowerCase() === projectMatch.toLowerCase());
+    if (found) projectId = found.id; else newProjectName = projectMatch;
+  }
+  return { title, tags, projectId, newProjectName, estimate };
+}
+
+// ─── Task Modal ────────────────────────────────────────────────────
+function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat,tasks,completions,settings,allTags,projects,onCreateProject,initialProjectId}){
   const [title,setTitle]=useState('');
   const [notes,setNotes]=useState('');
   const [estimate,setEstimate]=useState(0);
@@ -129,31 +160,55 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
   const [showTS,setShowTS]=useState(false);
   const [category,setCat]=useState('thing');
   const [date,setDate]=useState(dateStr);
+  const [projectId,setProjectId]=useState(null);
   const [recP,setRecP]=useState('none');
   const [recF,setRecF]=useState('daily');
   const [recI,setRecI]=useState(1);
   const [recD,setRecD]=useState([]);
+  const [nthWeekday,setNthWeekday]=useState(2);
+  const [nthN,setNthN]=useState(1);
+  const [monthDay,setMonthDay]=useState(1);
   const iRef=useRef(null);
-  function r2p(r){if(!r||r.type==='none')return'none';if(r.type==='weekdays'){const d=(r.days||[]).sort().join(',');if(d==='1,2,3,4,5')return'weekdays';if(d==='0,6')return'weekends';return'specific_days';}if(r.type==='daily'&&(r.interval||1)===1)return'every_day';if(r.type==='weekly'&&(r.interval||1)===1)return'every_week';if(r.type==='weekly'&&(r.interval||1)===2)return'every_2_weeks';if(r.type==='monthly'){const i=r.interval||1;if(i===1)return'every_month';if(i===3)return'every_3_months';if(i===6)return'every_6_months';if(i===12)return'every_year';}return'custom';}
+  function r2p(r){if(!r||r.type==='none')return'none';if(r.type==='weekdays'){const d=(r.days||[]).sort().join(',');if(d==='1,2,3,4,5')return'weekdays';if(d==='0,6')return'weekends';return'specific_days';}if(r.type==='monthday')return'month_day';if(r.type==='nthweekday')return'nth_weekday';if(r.type==='daily'&&(r.interval||1)===1)return'every_day';if(r.type==='weekly'&&(r.interval||1)===1)return'every_week';if(r.type==='weekly'&&(r.interval||1)===2)return'every_2_weeks';if(r.type==='monthly'){const i=r.interval||1;if(i===1)return'every_month';if(i===3)return'every_3_months';if(i===6)return'every_6_months';if(i===12)return'every_year';}return'custom';}
   function r2f(r){if(!r)return'daily';if(r.type==='daily')return'daily';if(r.type==='weekly')return'weekly';if(r.type==='monthly'&&(r.interval||1)>=12)return'yearly';if(r.type==='monthly')return'monthly';return'daily';}
-  useEffect(()=>{if(isOpen){setTitle(task?.title||'');setNotes(task?.notes||'');setEstimate(task?.estimate||0);
+  useEffect(()=>{if(isOpen){setTitle(task?.title||'');setNotes(task?.notes||'');setEstimate(task?.estimate||0);setProjectId(task?.projectId||initialProjectId||null);
     try{setTags(JSON.parse(task?.project||'[]'));}catch{setTags(task?.project?[task.project]:[]);}
-    setTagInput('');setCat(task?.category||initCat||'thing');setDate(task?.date||dateStr);const r=task?.recurrence||{type:'none'};setRecP(r2p(r));setRecF(r2f(r));setRecI(r.interval||1);setRecD(r.days||[]);setShowTS(false);setTimeout(()=>iRef.current?.focus(),100);}},[isOpen,task,dateStr,initCat]);
+    setTagInput('');setCat(task?.category||initCat||'thing');setDate(task?.date||dateStr);const r=task?.recurrence||{type:'none'};setRecP(r2p(r));setRecF(r2f(r));setRecI(r.interval||1);setRecD(r.days||[]);
+    if(r.type==='nthweekday'){setNthWeekday(r.weekday);setNthN(r.nth);}
+    if(r.type==='monthday'){setMonthDay(r.day);}
+    setShowTS(false);setTimeout(()=>iRef.current?.focus(),100);}},[isOpen,task,dateStr,initCat,initialProjectId]);
   if(!isOpen)return null;
   const fts=allTags.filter(t=>!tags.includes(t)&&t.toLowerCase().includes(tagInput.toLowerCase()));
   const addTag=(t)=>{if(t&&!tags.includes(t))setTags(p=>[...p,t]);setTagInput('');};
   const removeTag=(t)=>setTags(p=>p.filter(x=>x!==t));
-  const save=()=>{
+  const preview=useMemo(()=>{
+    const hasCmd=/#[\wÀ-ÿ]+|@[\wÀ-ÿ]+|\b\d+\s?(min|m|h|hr|hrs)\b/i.test(title);
+    if(!hasCmd)return null;
+    return parseQuickCommands(title, projects);
+  },[title,projects]);
+  const save=async()=>{
     if(!title.trim())return;
+    let finalTitle=title.trim(), finalTags=[...tags], finalEstimate=estimate, finalProjectId=projectId;
+    const parsed=parseQuickCommands(finalTitle, projects);
+    if(parsed.tags.length||parsed.projectId||parsed.newProjectName||parsed.estimate!=null){
+      finalTitle=parsed.title||finalTitle;
+      parsed.tags.forEach(t=>{if(!finalTags.includes(t))finalTags.push(t);});
+      if(parsed.estimate!=null)finalEstimate=parsed.estimate;
+      if(parsed.projectId)finalProjectId=parsed.projectId;
+      else if(parsed.newProjectName){const np=await onCreateProject(parsed.newProjectName);if(np)finalProjectId=np.id;}
+    }
+    if(!finalTitle.trim())return;
     const c=category,lim=settings.limits[c];
     if(!task){const ex=tasksFor(tasks,date,completions).filter(t=>t.category===c);if(ex.length>=lim){alert(`Límite de ${lim} alcanzado para "${CAT[c].label}". Programa para otro día.`);return;}}
     let rec={type:'none'};
-    if(recP==='every_day')rec={type:'daily',interval:1};else if(recP==='weekdays')rec={type:'weekdays',days:[1,2,3,4,5]};else if(recP==='weekends')rec={type:'weekdays',days:[0,6]};else if(recP==='every_week')rec={type:'weekly',interval:1};else if(recP==='every_2_weeks')rec={type:'weekly',interval:2};else if(recP==='every_month')rec={type:'monthly',interval:1};else if(recP==='every_3_months')rec={type:'monthly',interval:3};else if(recP==='every_6_months')rec={type:'monthly',interval:6};else if(recP==='every_year')rec={type:'monthly',interval:12};else if(recP==='specific_days')rec={type:'weekdays',days:recD};else if(recP==='custom'){if(recF==='daily')rec={type:'daily',interval:recI};else if(recF==='weekly')rec={type:'weekly',interval:recI};else if(recF==='monthly')rec={type:'monthly',interval:recI};else if(recF==='yearly')rec={type:'monthly',interval:recI*12};}
-    onSave({id:task?.id||uid(),title:title.trim(),notes:notes.trim(),estimate:estimate||0,project:JSON.stringify(tags),category:c,date,recurrence:rec,createdAt:task?.createdAt||Date.now()});onClose();
+    if(recP==='every_day')rec={type:'daily',interval:1};else if(recP==='weekdays')rec={type:'weekdays',days:[1,2,3,4,5]};else if(recP==='weekends')rec={type:'weekdays',days:[0,6]};else if(recP==='every_week')rec={type:'weekly',interval:1};else if(recP==='every_2_weeks')rec={type:'weekly',interval:2};else if(recP==='every_month')rec={type:'monthly',interval:1};else if(recP==='every_3_months')rec={type:'monthly',interval:3};else if(recP==='every_6_months')rec={type:'monthly',interval:6};else if(recP==='every_year')rec={type:'monthly',interval:12};else if(recP==='specific_days')rec={type:'weekdays',days:recD};else if(recP==='month_day')rec={type:'monthday',day:monthDay};else if(recP==='nth_weekday')rec={type:'nthweekday',weekday:nthWeekday,nth:nthN};else if(recP==='custom'){if(recF==='daily')rec={type:'daily',interval:recI};else if(recF==='weekly')rec={type:'weekly',interval:recI};else if(recF==='monthly')rec={type:'monthly',interval:recI};else if(recF==='yearly')rec={type:'monthly',interval:recI*12};}
+    onSave({id:task?.id||uid(),title:finalTitle,notes:notes.trim(),estimate:finalEstimate||0,project:JSON.stringify(finalTags),projectId:finalProjectId,category:c,date,recurrence:rec,createdAt:task?.createdAt||Date.now()});onClose();
   };
   const togD=(d)=>setRecD(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d].sort());
   const IS={width:'100%',boxSizing:'border-box',padding:'10px 14px',fontSize:14,fontFamily:F,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',transition:'border-color 0.2s'};
   const LS={fontSize:12,fontWeight:500,color:T.ts,display:'block',marginBottom:6};
+  const selectedProject=projects.find(p=>p.id===projectId);
+  const nthLabels={1:'primer',2:'segundo',3:'tercer',4:'cuarto',[-1]:'último'};
   return(
     <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}>
       <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',backdropFilter:'blur(4px)'}}/>
@@ -163,17 +218,32 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
             <h3 style={{margin:0,fontSize:18,fontWeight:600,color:T.text,fontFamily:SF}}>{task?'Editar tarea':'Nueva tarea'}</h3>
             <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="x" size={20}/></button>
           </div>
-          <input ref={iRef} value={title} onChange={e=>setTitle(e.target.value)} placeholder="¿Qué necesitas hacer?" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)save();}} style={{...IS,fontSize:15,padding:'12px 14px',borderRadius:T.r}} onFocus={e=>e.target.style.borderColor=T.text} onBlur={e=>e.target.style.borderColor=T.border}/>
+          <input ref={iRef} value={title} onChange={e=>setTitle(e.target.value)} placeholder="¿Qué necesitas hacer? Usa #tag @proyecto 30m" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)save();}} style={{...IS,fontSize:15,padding:'12px 14px',borderRadius:T.r}} onFocus={e=>e.target.style.borderColor=T.text} onBlur={e=>e.target.style.borderColor=T.border}/>
+          {preview&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8,alignItems:'center'}}>
+            <span style={{fontSize:10,color:T.tm,fontFamily:F}}>Se detectó:</span>
+            {preview.tags.map(t=><span key={t} style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:T.impBg,color:T.imp,fontFamily:F,fontWeight:500}}>#{t}</span>)}
+            {(preview.projectId||preview.newProjectName)&&<span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:T.thingBg,color:T.thing,fontFamily:F,fontWeight:500}}>@{preview.projectId?projects.find(p=>p.id===preview.projectId)?.name:`${preview.newProjectName} (nuevo)`}</span>}
+            {preview.estimate!=null&&<span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:T.accentSoft,color:T.ts,fontFamily:F,fontWeight:500}}>⏱ {fmtEst(preview.estimate)}</span>}
+          </div>}
           <div style={{display:'flex',gap:8,marginTop:16}}>
             {Object.entries(CAT).map(([k,m])=><button key={k} onClick={()=>setCat(k)} style={{flex:1,padding:'10px 8px',borderRadius:T.rs,cursor:'pointer',border:`1.5px solid ${category===k?m.color:T.border}`,background:category===k?m.bg:'transparent',color:category===k?m.color:T.ts,fontSize:12,fontWeight:600,fontFamily:F,transition:'all 0.2s',letterSpacing:'0.02em',textTransform:'uppercase'}}>{m.label}</button>)}
           </div>
-          <div style={{marginTop:16}}>
-            <label style={LS}>Fecha</label>
-            <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={IS}/>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:16}}>
+            <div>
+              <label style={LS}>Fecha</label>
+              <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={IS}/>
+            </div>
+            <div>
+              <label style={LS}>Proyecto</label>
+              <select value={projectId||''} onChange={e=>setProjectId(e.target.value||null)} style={{...IS,appearance:'auto',color:selectedProject?T.text:T.tm}}>
+                <option value="">Sin proyecto</option>
+                {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
           </div>
           <div style={{marginTop:16}}>
             <label style={LS}>Tiempo estimado</label>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
               {[0,15,30,45,60,90,120].map(m=><button key={m} onClick={()=>setEstimate(m)} style={{padding:'7px 12px',borderRadius:20,border:`1.5px solid ${estimate===m?T.text:T.border}`,background:estimate===m?T.text:'transparent',color:estimate===m?'#fff':T.ts,fontSize:12,fontWeight:estimate===m?600:400,cursor:'pointer',fontFamily:F,transition:'all 0.2s'}}>{m===0?'—':m<60?`${m}m`:`${m/60}h`}</button>)}
               <input type="number" min={0} max={480} value={estimate||''} onChange={e=>setEstimate(Math.max(0,+e.target.value))} placeholder="min" style={{width:60,padding:'7px 10px',fontSize:12,fontFamily:F,textAlign:'center',border:`1.5px solid ${T.border}`,borderRadius:20,color:T.text,background:T.bg,outline:'none'}}/>
             </div>
@@ -195,10 +265,12 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
           <div style={{marginTop:16}}>
             <label style={LS}>Repetir</label>
             <select value={recP} onChange={e=>{setRecP(e.target.value);if(e.target.value==='custom'){setRecF('daily');setRecI(1);}if(e.target.value==='specific_days')setRecD([]);}} style={{...IS,appearance:'auto'}}>
-              <option value="none">Nunca</option><option value="every_day">Cada día</option><option value="weekdays">Entre semana</option><option value="weekends">Fines de semana</option><option value="every_week">Cada semana</option><option value="every_2_weeks">Cada dos semanas</option><option value="every_month">Cada mes</option><option value="every_3_months">Cada 3 meses</option><option value="every_6_months">Cada 6 meses</option><option value="every_year">Cada año</option><option value="specific_days">Días específicos</option><option value="custom">Personalizado</option>
+              <option value="none">Nunca</option><option value="every_day">Cada día</option><option value="weekdays">Entre semana</option><option value="weekends">Fines de semana</option><option value="every_week">Cada semana</option><option value="every_2_weeks">Cada dos semanas</option><option value="every_month">Cada mes</option><option value="every_3_months">Cada 3 meses</option><option value="every_6_months">Cada 6 meses</option><option value="every_year">Cada año</option><option value="specific_days">Días específicos</option><option value="month_day">Día fijo del mes</option><option value="nth_weekday">Enésimo día de la semana</option><option value="custom">Personalizado</option>
             </select>
             {recP==='custom'&&<div style={{marginTop:10,padding:14,background:T.bg,borderRadius:T.rs,border:`1px solid ${T.borderLight}`}}><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}><span style={{fontSize:13,color:T.ts,flexShrink:0}}>Frecuencia:</span><select value={recF} onChange={e=>setRecF(e.target.value)} style={{...IS,flex:1,width:'auto',padding:'8px 10px',fontSize:13,background:T.surface,appearance:'auto'}}><option value="daily">Cada día</option><option value="weekly">Cada semana</option><option value="monthly">Cada mes</option><option value="yearly">Cada año</option></select></div><div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:13,color:T.ts}}>Cada</span><input type="number" min={1} max={99} value={recI} onChange={e=>setRecI(Math.max(1,+e.target.value))} style={{...IS,width:56,textAlign:'center',padding:'8px 10px',background:T.surface}}/><span style={{fontSize:13,color:T.ts}}>{recF==='daily'?'día(s)':recF==='weekly'?'semana(s)':recF==='monthly'?'mes(es)':'año(s)'}</span></div></div>}
             {recP==='specific_days'&&<div style={{marginTop:10}}><span style={{fontSize:12,color:T.ts,display:'block',marginBottom:8}}>Selecciona los días:</span><div style={{display:'flex',gap:6,justifyContent:'space-between'}}>{dayNames.map((d,i)=><button key={i} onClick={()=>togD(i)} style={{flex:1,maxWidth:46,height:42,borderRadius:T.rs,border:`1.5px solid ${recD.includes(i)?T.text:T.border}`,background:recD.includes(i)?T.text:'transparent',color:recD.includes(i)?'#fff':T.ts,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:F,transition:'all 0.2s',display:'flex',alignItems:'center',justifyContent:'center'}}>{d}</button>)}</div></div>}
+            {recP==='month_day'&&<div style={{marginTop:10,display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:13,color:T.ts}}>Cada día</span><select value={monthDay} onChange={e=>setMonthDay(+e.target.value)} style={{...IS,width:'auto',flex:1,padding:'8px 10px',fontSize:13,appearance:'auto'}}>{Array.from({length:31},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}</select><span style={{fontSize:13,color:T.ts}}>del mes</span></div>}
+            {recP==='nth_weekday'&&<div style={{marginTop:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{fontSize:13,color:T.ts}}>Cada</span><select value={nthN} onChange={e=>setNthN(+e.target.value)} style={{...IS,width:'auto',padding:'8px 10px',fontSize:13,appearance:'auto'}}>{[1,2,3,4,-1].map(n=><option key={n} value={n}>{nthLabels[n]}</option>)}</select><select value={nthWeekday} onChange={e=>setNthWeekday(+e.target.value)} style={{...IS,width:'auto',padding:'8px 10px',fontSize:13,appearance:'auto'}}>{dayNamesFull.map((d,i)=><option key={i} value={i}>{d}</option>)}</select><span style={{fontSize:13,color:T.ts}}>de cada mes</span></div>}
           </div>
         </div>
         <div style={{padding:'20px 24px',display:'flex',gap:10,justifyContent:task?'space-between':'flex-end',marginTop:8}}>
@@ -247,9 +319,10 @@ function SettingsModal({isOpen,onClose,settings,onSave,showRec,setShowRec}){
   </div></div>);
 }
 
-function TaskItem({task,onToggle,onEdit,onCatDrag}){
+function TaskItem({task,onToggle,onEdit,onCatDrag,projects}){
   const m=CAT[task.category],[hov,setHov]=useState(false),[exp,setExp]=useState(false),[justChecked,setJC]=useState(false);
   const hasN=!!task.notes;
+  const proj=projects?.find(p=>p.id===task.projectId);
   const doToggle=()=>{if(!task.completed)setJC(true);onToggle();setTimeout(()=>setJC(false),600);};
   return(<div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} draggable
     onDragStart={e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:task.id,cat:task.category}));e.dataTransfer.effectAllowed='move';}}>
@@ -259,6 +332,7 @@ function TaskItem({task,onToggle,onEdit,onCatDrag}){
       </button>
       <div style={{flex:1,minWidth:0}} onClick={doToggle}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
+          {proj&&<span title={proj.name} style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:proj.color,flexShrink:0}}/>}
           <span style={{fontSize:14,color:task.completed?T.tm:T.text,textDecoration:task.completed?'line-through':'none',fontFamily:F,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',transition:'color 0.3s'}}>{task.title}</span>
           {task.project&&(()=>{try{const tgs=JSON.parse(task.project);return Array.isArray(tgs)?tgs.map(t=><PPill key={t} name={t}/>):<PPill name={task.project}/>;}catch{return<PPill name={task.project}/>;}})()}
           {task.estimate>0&&<span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 7px',borderRadius:20,background:T.bg,color:T.tm,fontSize:10,fontWeight:500,fontFamily:F,lineHeight:1.6,whiteSpace:'nowrap',flexShrink:0,border:`1px solid ${T.borderLight}`}}>⏱ {fmtEst(task.estimate)}</span>}
@@ -275,7 +349,7 @@ function TaskItem({task,onToggle,onEdit,onCatDrag}){
 const EMPTY_MSG={thing:['¿Cuál es tu batalla principal hoy?','Define tu prioridad #1','¿Qué moverá la aguja hoy?'],important:['¿Qué 3 cosas importan hoy?','Agrega tus tareas clave','¿Qué debes entregar?'],maintenance:['Tareas rápidas y sencillas','Lo que no requiere enfoque','Correos, admin, rutina']};
 const EMPTY_SVG={thing:<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" opacity="0.3"/><circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" opacity="0.5"/><circle cx="12" cy="12" r="1.5" fill="currentColor" opacity="0.7"/></svg>,important:<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" stroke="currentColor" strokeWidth="1.5" opacity="0.35" fill="none"/></svg>,maintenance:<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" opacity="0.3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="1.5" opacity="0.25" strokeLinecap="round"/></svg>};
 
-function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,limit,dateStr}){
+function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,limit,dateStr,projects}){
   const m=CAT[category],at=tasks.length>=limit,dc=tasks.filter(t=>t.completed).length;
   const totalEst=tasks.reduce((s,t)=>s+(t.estimate||0),0);
   const isThing=category==='thing';
@@ -301,7 +375,7 @@ function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange
         {EMPTY_SVG[category]}
         <span style={{fontSize:12,fontFamily:F,fontStyle:'italic'}}>{emptyMsg}</span>
       </div>}
-      {tasks.map(t=><TaskItem key={t.id+'_'+t.date} task={t} onToggle={()=>onToggle(t)} onEdit={()=>onEdit(t)}/>)}
+      {tasks.map(t=><TaskItem key={t.id+'_'+t.date} task={t} onToggle={()=>onToggle(t)} onEdit={()=>onEdit(t)} projects={projects}/>)}
       {qaOpen&&<div style={{padding:'8px 12px',display:'flex',gap:8,alignItems:'center'}}>
         <input ref={qaRef} value={qaVal} onChange={e=>setQaVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doQA();if(e.key==='Escape'){setQaOpen(false);setQaVal('');}}} placeholder="Escribe y Enter..." style={{flex:1,padding:'8px 10px',fontSize:13,fontFamily:F,border:`1.5px solid ${m.color}44`,borderRadius:T.rs,outline:'none',background:'transparent',color:T.text}} onBlur={()=>{if(!qaVal.trim()){setQaOpen(false);setQaVal('');}}}/>
         <button onClick={doQA} style={{background:m.color,color:'#fff',border:'none',borderRadius:T.rs,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:F,opacity:qaVal.trim()?1:0.4}}>+</button>
@@ -310,7 +384,7 @@ function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange
   </div>);
 }
 
-function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,settings}){
+function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onCatChange,settings,projects}){
   const dt=useMemo(()=>tasksFor(tasks,dateStr,completions),[tasks,dateStr,completions]);
   const d=parseDate(dateStr),done=dt.filter(t=>t.completed).length,tot=dt.length,pct=tot>0?Math.round(done/tot*100):0;
   return(<div key={dateStr} style={{animation:'fadeSlideIn 0.2s ease'}}>
@@ -319,11 +393,11 @@ function DayView({dateStr,tasks,completions,onToggle,onEdit,onAdd,onQuickAdd,onC
       <h2 style={{margin:0,fontSize:36,fontWeight:400,color:T.text,fontFamily:SF,lineHeight:1.1}}>{d.getDate()} <span style={{fontSize:24,color:T.ts}}>{monthNames[d.getMonth()]}</span></h2>
       <p style={{margin:'4px 0 0',fontSize:14,color:T.tm,fontFamily:F}}>{dayNamesFull[d.getDay()]}{(()=>{const totalEst=dt.reduce((s,t)=>s+(t.estimate||0),0);return totalEst>0?<span style={{marginLeft:8,fontSize:12,color:T.ts}}>· ⏱ {fmtEst(totalEst)}</span>:null;})()}</p>
     </div>
-    {['thing','important','maintenance'].map(c=><CatSection key={c} category={c} tasks={dt.filter(t=>t.category===c)} onToggle={onToggle} onEdit={onEdit} onAdd={()=>onAdd(c)} onQuickAdd={onQuickAdd} onCatChange={onCatChange} limit={settings.limits[c]} dateStr={dateStr}/>)}
+    {['thing','important','maintenance'].map(c=><CatSection key={c} category={c} tasks={dt.filter(t=>t.category===c)} onToggle={onToggle} onEdit={onEdit} onAdd={()=>onAdd(c)} onQuickAdd={onQuickAdd} onCatChange={onCatChange} limit={settings.limits[c]} dateStr={dateStr} projects={projects}/>)}
   </div>);
 }
 
-function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions,onMoveTask,settings}){
+function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions,onMoveTask,onDropProject,settings,projects}){
   const ww=settings?.workWeek;
   const allDays=Array.from({length:14},(_,i)=>addDays(weekStart,i));
   const days=ww?allDays.filter(d=>{const dw=d.getDay();return dw>=1&&dw<=5;}):allDays;
@@ -332,24 +406,27 @@ function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClick
   const capLoad=Math.min(maxTasks,8);
   const tr={display:'block',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'};
   const [dragOver,setDragOver]=useState(null);
+  const projById=(id)=>projects?.find(p=>p.id===id);
+  const PDot=({pid})=>{const p=projById(pid);return p?<span style={{display:'inline-block',width:5,height:5,borderRadius:'50%',background:p.color,flexShrink:0,marginRight:4}}/>:null;};
   return(<div style={{display:'flex',flexDirection:'column',flex:1}}>
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:2,marginBottom:4}}>{(ww?['Lun','Mar','Mié','Jue','Vie']:dayNames).map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:'repeat(2,1fr)',gap:6,flex:1}}>{days.map(d=>{
     const ds=fmt(d),isT=ds===fmt(today),isS=ds===selectedDate,dt=tasksFor(tasks,ds,completions),tt=dt.find(t=>t.category==='thing'),im=dt.filter(t=>t.category==='important'),ma=dt.filter(t=>t.category==='maintenance'),hT=!!tt,hI=im.length>0,hM=ma.length>0,ad=dt.length>0&&dt.every(t=>t.completed);
     const load=Math.min(dt.length/capLoad,1);const loadCol=ad?T.ok:load>0.7?T.thing:load>0.4?'#f59e0b':T.imp;
+    const isProjDrag=dragOver===ds+'_proj';
     return<div key={ds} onClick={()=>onSelectDate(ds)} onDoubleClick={()=>onDoubleClickDate(ds)}
-      onDragOver={e=>{e.preventDefault();setDragOver(ds);}}
+      onDragOver={e=>{e.preventDefault();const isProj=e.dataTransfer.types.includes('application/x-project');setDragOver(isProj?ds+'_proj':ds);}}
       onDragLeave={()=>setDragOver(null)}
-      onDrop={e=>{e.preventDefault();setDragOver(null);const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
+      onDrop={e=>{e.preventDefault();setDragOver(null);const pid=e.dataTransfer.getData('application/x-project');if(pid){onDropProject&&onDropProject(pid,ds);return;}const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
       onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 6px 20px rgba(0,0,0,0.1)`:'0 6px 20px rgba(0,0,0,0.08)';}}
       onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)';}}
-      style={{padding:'12px 10px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:dragOver===ds?`2px dashed ${T.imp}`:'none',background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)'}}>
+      style={{padding:'12px 10px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isProjDrag?`2px dashed ${T.thing}`:dragOver===ds?`2px dashed ${T.imp}`:'none',background:isProjDrag?T.thingBg:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)'}}>
       {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'10px 10px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.04em'}}>{dayNames[d.getDay()]}</span><div style={{display:'flex',alignItems:'center',gap:4}}>{(()=>{const te=dt.reduce((s,t)=>s+(t.estimate||0),0);return te>0?<span style={{fontSize:9,color:T.tm,fontFamily:F}}>⏱{fmtEst(te)}</span>:null;})()}<span style={{fontSize:18,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div></div>
       <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
-        {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:12,padding:'4px 8px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',...tr}}>{tt.title}</div>}
-        {im.map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:11,padding:'3px 8px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
-        {ma.map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 8px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>)}
+        {tt&&<div draggable onDragStart={e=>e.dataTransfer.setData('text/plain',tt.id)} style={{fontSize:12,padding:'4px 8px',borderRadius:4,background:tt.completed?T.okBg:T.thingBg,color:tt.completed?T.ok:T.thing,fontWeight:500,textDecoration:tt.completed?'line-through':'none',cursor:'grab',display:'flex',alignItems:'center'}}><PDot pid={tt.projectId}/><span style={tr}>{tt.title}</span></div>}
+        {im.map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:11,padding:'3px 8px',borderRadius:3,color:t.completed?T.ok:T.imp,textDecoration:t.completed?'line-through':'none',cursor:'grab',display:'flex',alignItems:'center'}}><PDot pid={t.projectId}/><span style={tr}>{t.title}</span></div>)}
+        {ma.map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',t.id)} style={{fontSize:10,padding:'2px 8px',borderRadius:3,color:t.completed?T.ok:T.maint,textDecoration:t.completed?'line-through':'none',cursor:'grab',display:'flex',alignItems:'center'}}><PDot pid={t.projectId}/><span style={tr}>{t.title}</span></div>)}
       </div>
       {dt.length>0&&<div style={{display:'flex',gap:3,paddingTop:6,justifyContent:'center'}}>{hT&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.thing}}/>}{hI&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.imp}}/>}{hM&&<div style={{width:5,height:5,borderRadius:'50%',background:ad?T.ok:T.maint}}/>}</div>}
     </div>;
@@ -357,7 +434,7 @@ function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClick
   </div>);
 }
 
-function PanoramaView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions,onMoveTask,settings}){
+function PanoramaView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDate,tasks,completions,onMoveTask,onDropProject,settings,projects}){
   const ww=settings?.workWeek;
   const dn=ww?['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']:dayNames;
   const allDays=Array.from({length:21},(_,i)=>addDays(weekStart,i));
@@ -369,6 +446,7 @@ function PanoramaView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDa
   const [dragOver,setDragOver]=useState(null);
   const [expanded,setExpanded]=useState({});
   const MAX_VIS=5;
+  const projById=(id)=>projects?.find(p=>p.id===id);
   return(<div style={{display:'flex',flexDirection:'column',flex:1}}>
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:2,marginBottom:4}}>{dn.slice(0,cols).map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,color:T.tm,padding:'6px 0',fontFamily:F,letterSpacing:'0.05em'}}>{d}</div>)}</div>
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${rows},1fr)`,gap:6,flex:1}}>{days.map(d=>{
@@ -376,17 +454,18 @@ function PanoramaView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDa
     const load=Math.min(dt.length/capLoad,1);const loadCol=ad?T.ok:load>0.7?T.thing:load>0.4?'#f59e0b':T.imp;
     const all=[...(tt?[{...tt,_s:'t'}]:[]),...im.map(x=>({...x,_s:'i'})),...ma.map(x=>({...x,_s:'m'}))];
     const isExp=!!expanded[ds];const vis=isExp?all:all.slice(0,MAX_VIS);const rem=all.length-MAX_VIS;
+    const isProjDrag=dragOver===ds+'_proj';
     return<div key={ds} onClick={()=>onSelectDate(ds)} onDoubleClick={()=>onDoubleClickDate(ds)}
-      onDragOver={e=>{e.preventDefault();setDragOver(ds);}}
+      onDragOver={e=>{e.preventDefault();const isProj=e.dataTransfer.types.includes('application/x-project');setDragOver(isProj?ds+'_proj':ds);}}
       onDragLeave={()=>setDragOver(null)}
-      onDrop={e=>{e.preventDefault();setDragOver(null);const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
+      onDrop={e=>{e.preventDefault();setDragOver(null);const pid=e.dataTransfer.getData('application/x-project');if(pid){onDropProject&&onDropProject(pid,ds);return;}const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
       onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 6px 20px rgba(0,0,0,0.1)`:'0 6px 20px rgba(0,0,0,0.08)';}}
       onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)';}}
-      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:dragOver===ds?`2px dashed ${T.imp}`:'none',background:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:isExp?'visible':'hidden',minWidth:0,minHeight:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)',zIndex:isExp?10:0}}>
+      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isProjDrag?`2px dashed ${T.thing}`:dragOver===ds?`2px dashed ${T.imp}`:'none',background:isProjDrag?T.thingBg:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:isExp?'visible':'hidden',minWidth:0,minHeight:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)',zIndex:isExp?10:0}}>
       {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'6px 6px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><span style={{fontSize:10,color:T.tm}}>{monthNames[d.getMonth()].slice(0,3)}</span><div style={{display:'flex',alignItems:'center',gap:3}}>{(()=>{const te=dt.reduce((s,t)=>s+(t.estimate||0),0);return te>0?<span style={{fontSize:8,color:T.tm,fontFamily:F}}>⏱{fmtEst(te)}</span>:null;})()}<span style={{fontSize:15,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div></div>
       <div style={{flex:isExp?'none':1,display:'flex',flexDirection:'column',gap:2,minWidth:0,overflow:'hidden'}}>
-        {vis.map(t=>{const s=t._s==='t'?{fontSize:11,padding:'3px 6px',borderRadius:4,background:t.completed?T.okBg:T.thingBg,color:t.completed?T.ok:T.thing,fontWeight:500}:t._s==='i'?{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.imp}:{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.maint};return<div key={t.id} draggable onDragStart={e=>{e.stopPropagation();e.dataTransfer.setData('text/plain',t.id);}} style={{...s,textDecoration:t.completed?'line-through':'none',cursor:'grab',...tr}}>{t.title}</div>;})}
+        {vis.map(t=>{const s=t._s==='t'?{fontSize:11,padding:'3px 6px',borderRadius:4,background:t.completed?T.okBg:T.thingBg,color:t.completed?T.ok:T.thing,fontWeight:500}:t._s==='i'?{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.imp}:{fontSize:10,padding:'2px 6px',borderRadius:3,color:t.completed?T.ok:T.maint};const proj=projById(t.projectId);return<div key={t.id} draggable onDragStart={e=>{e.stopPropagation();e.dataTransfer.setData('text/plain',t.id);}} style={{...s,textDecoration:t.completed?'line-through':'none',cursor:'grab',display:'flex',alignItems:'center'}}>{proj&&<span style={{display:'inline-block',width:4,height:4,borderRadius:'50%',background:proj.color,flexShrink:0,marginRight:3}}/>}<span style={tr}>{t.title}</span></div>;})}
       </div>
       {rem>0&&!isExp&&<button onClick={e=>{e.stopPropagation();setExpanded(p=>({...p,[ds]:true}));}} style={{marginTop:4,padding:'4px 8px',borderRadius:T.rs,border:`1px solid ${T.borderLight}`,background:T.bg,cursor:'pointer',fontSize:10,fontWeight:600,color:T.ts,fontFamily:F,textAlign:'center',width:'100%',transition:'all 0.15s'}} onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover} onMouseLeave={e=>e.currentTarget.style.background=T.bg}>+{rem} más</button>}
       {isExp&&rem>0&&<button onClick={e=>{e.stopPropagation();setExpanded(p=>{const n={...p};delete n[ds];return n;});}} style={{marginTop:3,padding:'3px 6px',borderRadius:T.rs,border:'none',background:'transparent',cursor:'pointer',fontSize:9,color:T.tm,fontFamily:F,textAlign:'center',width:'100%'}}>Colapsar</button>}
@@ -472,9 +551,48 @@ function FocusMode({task,onToggle,onExit}){
   );
 }
 
+// ─── Projects Sidebar (right, half-width of left panel) ────────────
+const PROJECT_PALETTE=['#dc2626','#2563eb','#16a34a','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#ea580c','#4f46e5'];
+function ProjectsSidebar({projects,onAdd,onDelete,onDragStart}){
+  const [adding,setAdding]=useState(false),[name,setName]=useState('');
+  const iRef=useRef(null);
+  const nextColor=PROJECT_PALETTE[projects.length%PROJECT_PALETTE.length];
+  const doAdd=()=>{if(name.trim()){onAdd(name.trim(),nextColor);setName('');setAdding(false);}};
+  return(
+    <div style={{width:170,flexShrink:0,paddingLeft:0}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+        <span style={{fontSize:12,fontWeight:600,color:T.tm,textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:F}}>Proyectos</span>
+        <button onClick={()=>{setAdding(true);setTimeout(()=>iRef.current?.focus(),50);}} style={{background:'none',border:'none',cursor:'pointer',padding:2,opacity:0.5,transition:'opacity 0.2s'}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}><Ic name="plus" size={14} color={T.tm}/></button>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {projects.length===0&&!adding&&<p style={{fontSize:11,color:T.tm,fontStyle:'italic',fontFamily:F,opacity:0.6,lineHeight:1.5}}>Sin proyectos activos. Agrega uno o usa @nombre al crear una tarea.</p>}
+        {projects.map(p=>(
+          <div key={p.id} draggable onDragStart={e=>{e.dataTransfer.setData('application/x-project',p.id);onDragStart&&onDragStart(p.id);}}
+            style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:T.rs,background:T.surface,border:`1px solid ${T.borderLight}`,cursor:'grab',transition:'all 0.15s',position:'relative'}}
+            onMouseEnter={e=>{e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)';e.currentTarget.style.transform='translateX(-1px)';}}
+            onMouseLeave={e=>{e.currentTarget.style.boxShadow='none';e.currentTarget.style.transform='';}}
+          >
+            <div style={{width:8,height:8,borderRadius:'50%',background:p.color,flexShrink:0}}/>
+            <span style={{flex:1,fontSize:12,color:T.text,fontFamily:F,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
+            <button onClick={()=>{if(confirm(`¿Finalizar "${p.name}"? Las tareas conservarán su color pero el proyecto se eliminará.`))onDelete(p.id);}} title="Finalizar proyecto" style={{background:'none',border:'none',cursor:'pointer',padding:1,opacity:0.3,transition:'opacity 0.15s',flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.3}><Ic name="x" size={11} color={T.tm}/></button>
+          </div>
+        ))}
+        {adding&&(
+          <div style={{display:'flex',alignItems:'center',gap:6,padding:'6px 8px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,background:T.bg}}>
+            <div style={{width:8,height:8,borderRadius:'50%',background:nextColor,flexShrink:0}}/>
+            <input ref={iRef} value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doAdd();if(e.key==='Escape'){setAdding(false);setName('');}}} onBlur={()=>{if(!name.trim())setAdding(false);}} placeholder="Nombre..." style={{flex:1,border:'none',outline:'none',background:'transparent',fontSize:12,fontFamily:F,color:T.text,minWidth:0}}/>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // ═══════════════════════════════════════════════════════════════════
 export default function FocusDay({supabase,user,onSignOut}){
   const [loaded,setLoaded]=useState(false),[tasks,setTasks]=useState([]),[comp,setComp]=useState({}),[settings,setSettings]=useState(DSET);
+  const [projects,setProjects]=useState([]);
   const [rightView,setRightView]=useState('week'),[today,setToday]=useState(()=>new Date()),[selD,setSelD]=useState(()=>fmt(new Date()));
   const [wS,setWS]=useState(()=>startOfWeek(new Date()));
 
@@ -505,17 +623,35 @@ export default function FocusDay({supabase,user,onSignOut}){
 
   useEffect(()=>{if(!user)return;async function ld(){
     const{data:tr}=await supabase.from('tasks').select('*').eq('user_id',user.id);
-    setTasks((tr||[]).map(r=>({id:r.id,title:r.title,notes:r.notes||'',estimate:r.estimate||0,project:r.project||'',category:r.category,date:r.date,recurrence:r.recurrence||{type:'none'},createdAt:r.created_at})));
+    setTasks((tr||[]).map(r=>({id:r.id,title:r.title,notes:r.notes||'',estimate:r.estimate||0,project:r.project||'',projectId:r.project_id||null,category:r.category,date:r.date,recurrence:r.recurrence||{type:'none'},createdAt:r.created_at})));
+    const{data:pr}=await supabase.from('projects').select('*').eq('user_id',user.id).order('created_at',{ascending:true});
+    setProjects((pr||[]).map(r=>({id:r.id,name:r.name,color:r.color})));
     const{data:cr}=await supabase.from('completions').select('*').eq('user_id',user.id);const lc={};(cr||[]).forEach(r=>{lc[`${r.task_id}::${r.date}`]=true;});setComp(lc);
     const{data:sr}=await supabase.from('user_settings').select('*').eq('user_id',user.id).single();
     const rawLim=sr?.limits||{};const{_shortcut,_dark,_workWeek,_onboarded,...limOnly}=rawLim;
     setSettings(sr?{limits:{...DSET.limits,...limOnly},shortcut:_shortcut||'n',dark:!!_dark,workWeek:!!_workWeek,onboarded:!!_onboarded}:DSET);setLoaded(true);
   }ld();},[user,supabase]);
 
-  const saveTask=useCallback(async(t)=>{setTasks(p=>{const i=p.findIndex(x=>x.id===t.id);if(i>=0){const n=[...p];n[i]=t;return n;}return[...p,t];});await supabase.from('tasks').upsert({id:t.id,user_id:user.id,title:t.title,notes:t.notes||'',estimate:t.estimate||0,project:t.project||'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});},[supabase,user]);
+  const saveTask=useCallback(async(t)=>{setTasks(p=>{const i=p.findIndex(x=>x.id===t.id);if(i>=0){const n=[...p];n[i]=t;return n;}return[...p,t];});await supabase.from('tasks').upsert({id:t.id,user_id:user.id,title:t.title,notes:t.notes||'',estimate:t.estimate||0,project:t.project||'',project_id:t.projectId||null,category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});},[supabase,user]);
   const delTask=useCallback(async(id)=>{setTasks(p=>p.filter(t=>t.id!==id));setComp(p=>{const n={...p};Object.keys(n).filter(k=>k.startsWith(id+'::')).forEach(k=>delete n[k]);return n;});await supabase.from('tasks').delete().eq('id',id).eq('user_id',user.id);},[supabase,user]);
   const toggle=useCallback(async(task)=>{const k=`${task.id}::${selD}`,was=!!comp[k];setComp(p=>{const n={...p};if(was)delete n[k];else n[k]=true;return n;});if(was)await supabase.from('completions').delete().eq('user_id',user.id).eq('task_id',task.id).eq('date',selD);else await supabase.from('completions').insert({user_id:user.id,task_id:task.id,date:selD});},[supabase,user,selD,comp]);
   const saveSets=useCallback(async(s)=>{setSettings(s);await supabase.from('user_settings').upsert({user_id:user.id,limits:{...s.limits,_shortcut:s.shortcut||'n',_dark:!!s.dark,_workWeek:!!s.workWeek,_onboarded:!!s.onboarded},updated_at:new Date().toISOString()});},[supabase,user]);
+
+  // Projects CRUD
+  const createProject=useCallback(async(name,color)=>{
+    const existing=projects.find(p=>p.name.toLowerCase()===name.toLowerCase());
+    if(existing)return existing;
+    const c=color||PROJECT_PALETTE[projects.length%PROJECT_PALETTE.length];
+    const p={id:uid(),name,color:c};
+    setProjects(prev=>[...prev,p]);
+    await supabase.from('projects').insert({id:p.id,user_id:user.id,name:p.name,color:p.color});
+    return p;
+  },[supabase,user,projects]);
+  const deleteProject=useCallback(async(id)=>{
+    setProjects(prev=>prev.filter(p=>p.id!==id));
+    setTasks(prev=>prev.map(t=>t.projectId===id?{...t,projectId:null}:t));
+    await supabase.from('projects').delete().eq('id',id).eq('user_id',user.id);
+  },[supabase,user]);
 
   // Drag-and-drop: move task to a new date
   const moveTask=useCallback(async(taskId,newDate)=>{
@@ -525,9 +661,9 @@ export default function FocusDay({supabase,user,onSignOut}){
 
   // Quick-add: create task inline
   const quickAdd=useCallback(async(title,category)=>{
-    const t={id:uid(),title,notes:'',project:'',category,date:selD,recurrence:{type:'none'},createdAt:Date.now()};
+    const t={id:uid(),title,notes:'',project:'',projectId:null,category,date:selD,recurrence:{type:'none'},createdAt:Date.now()};
     setTasks(p=>[...p,t]);
-    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
+    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',project_id:null,category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
   },[supabase,user,selD]);
 
   // Change task category (drag between sections)
@@ -538,10 +674,16 @@ export default function FocusDay({supabase,user,onSignOut}){
 
   // Backlog quick-add (task with date=BL_DATE)
   const backlogAdd=useCallback(async(title)=>{
-    const t={id:uid(),title,notes:'',project:'',category:'important',date:BL_DATE,recurrence:{type:'none'},createdAt:Date.now()};
+    const t={id:uid(),title,notes:'',project:'',projectId:null,category:'important',date:BL_DATE,recurrence:{type:'none'},createdAt:Date.now()};
     setTasks(p=>[...p,t]);
-    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
+    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',project_id:null,category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
   },[supabase,user]);
+
+  // Dropping a project pill onto a calendar date opens the modal pre-filled
+  const [pendingProjectDrop,setPendingProjectDrop]=useState(null);
+  const handleDateDropProject=useCallback((projectId,ds)=>{
+    setSelD(ds);setETask(null);setACat('thing');setPendingProjectDrop(projectId);setMOpen(true);
+  },[]);
 
   const scrollRef=useRef(0);
 
@@ -577,8 +719,8 @@ export default function FocusDay({supabase,user,onSignOut}){
         </div>
       </div>
 
-      {/* Split layout: Left = DayView, Right = Month/Week */}
-      <div style={{display:'grid',gridTemplateColumns:'340px 1fr',gap:32,flex:1,minHeight:0}}>
+      {/* Split layout: Left = DayView, Center = Calendar, Right = Projects */}
+      <div style={{display:'grid',gridTemplateColumns:'340px 1fr 170px',gap:32,flex:1,minHeight:0}}>
         {/* LEFT: Day View (always visible) */}
         <div style={{overflowY:'auto',paddingRight:8}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
@@ -586,12 +728,12 @@ export default function FocusDay({supabase,user,onSignOut}){
             <span style={{fontSize:14,fontWeight:600,fontFamily:F}}>{sd.getDate()} {monthNames[sd.getMonth()]} {sd.getFullYear()}</span>
             <button onClick={()=>setSelD(fmt(addDays(sd,1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={16}/></button>
           </div>
-          <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} onQuickAdd={quickAdd} onCatChange={catChange} settings={settings}/>
+          <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} onQuickAdd={quickAdd} onCatChange={catChange} settings={settings} projects={projects}/>
           {(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return theThing?<button onClick={()=>setFocusMode(true)} style={{marginTop:16,width:'100%',padding:'10px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.thing,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'transform 0.2s',opacity:0.9}} onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.02)';e.currentTarget.style.opacity='1';}} onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.opacity='0.9';}}><Ic name="focus" size={16} color="#fff"/>Focus Mode</button>:null;})()}
           <Backlog tasks={tasks} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onMoveToDate={moveTask} onQuickAdd={backlogAdd} onDelete={delTask}/>
         </div>
 
-        {/* RIGHT: Calendar panel — scroll to navigate */}
+        {/* CENTER: Calendar panel — scroll to navigate */}
         <div style={{display:'flex',flexDirection:'column',minHeight:0}}
           onWheel={e=>{e.preventDefault();const now=Date.now();if(now-scrollRef.current<400)return;scrollRef.current=now;const dir=e.deltaY>0?1:-1;const step=rightView==='panorama'?3:1;setWS(p=>addDays(p,dir*step*7));}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
@@ -606,12 +748,15 @@ export default function FocusDay({supabase,user,onSignOut}){
               </div>
             </div>
           </div>
-          {rightView==='week'&&<SingleWeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} onDoubleClickDate={hDblClick} tasks={calTasks} completions={comp} onMoveTask={moveTask} settings={settings}/>}
-          {rightView==='panorama'&&<PanoramaView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} onDoubleClickDate={hDblClick} tasks={calTasks} completions={comp} onMoveTask={moveTask} settings={settings}/>}
+          {rightView==='week'&&<SingleWeekView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} onDoubleClickDate={hDblClick} tasks={calTasks} completions={comp} onMoveTask={moveTask} onDropProject={handleDateDropProject} settings={settings} projects={projects}/>}
+          {rightView==='panorama'&&<PanoramaView weekStart={wS} today={today} selectedDate={selD} onSelectDate={setSelD} onDoubleClickDate={hDblClick} tasks={calTasks} completions={comp} onMoveTask={moveTask} onDropProject={handleDateDropProject} settings={settings} projects={projects}/>}
         </div>
+
+        {/* RIGHT: Projects sidebar */}
+        <ProjectsSidebar projects={projects} onAdd={(name,color)=>createProject(name,color)} onDelete={deleteProject}/>
       </div>
 
-      <TaskModal isOpen={mOpen} onClose={()=>{setMOpen(false);setETask(null);}} onSave={saveTask} onDelete={delTask} task={eTask} dateStr={selD} category={aCat} tasks={tasks} completions={comp} settings={settings} allTags={allTags}/>
+      <TaskModal isOpen={mOpen} onClose={()=>{setMOpen(false);setETask(null);setPendingProjectDrop(null);}} onSave={saveTask} onDelete={delTask} task={eTask} dateStr={selD} category={aCat} tasks={tasks} completions={comp} settings={settings} allTags={allTags} projects={projects} onCreateProject={createProject} initialProjectId={pendingProjectDrop}/>
       <SettingsModal isOpen={sOpen} onClose={()=>setSOpen(false)} settings={settings} onSave={saveSets} showRec={showRec} setShowRec={setShowRec}/>
       {focusMode&&(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return<FocusMode task={theThing} onToggle={()=>{if(theThing)toggle(theThing);}} onExit={()=>setFocusMode(false)}/>;})()}
     </div>
