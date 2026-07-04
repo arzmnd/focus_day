@@ -177,15 +177,15 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
     if(r.type==='nthweekday'){setNthWeekday(r.weekday);setNthN(r.nth);}
     if(r.type==='monthday'){setMonthDay(r.day);}
     setShowTS(false);setTimeout(()=>iRef.current?.focus(),100);}},[isOpen,task,dateStr,initCat,initialProjectId]);
-  if(!isOpen)return null;
-  const fts=allTags.filter(t=>!tags.includes(t)&&t.toLowerCase().includes(tagInput.toLowerCase()));
-  const addTag=(t)=>{if(t&&!tags.includes(t))setTags(p=>[...p,t]);setTagInput('');};
-  const removeTag=(t)=>setTags(p=>p.filter(x=>x!==t));
   const preview=useMemo(()=>{
     const hasCmd=/#[\wÀ-ÿ]+|@[\wÀ-ÿ]+|\b\d+\s?(min|m|h|hr|hrs)\b/i.test(title);
     if(!hasCmd)return null;
     return parseQuickCommands(title, projects);
   },[title,projects]);
+  if(!isOpen)return null;
+  const fts=allTags.filter(t=>!tags.includes(t)&&t.toLowerCase().includes(tagInput.toLowerCase()));
+  const addTag=(t)=>{if(t&&!tags.includes(t))setTags(p=>[...p,t]);setTagInput('');};
+  const removeTag=(t)=>setTags(p=>p.filter(x=>x!==t));
   const save=async()=>{
     if(!title.trim())return;
     let finalTitle=title.trim(), finalTags=[...tags], finalEstimate=estimate, finalProjectId=projectId;
@@ -660,11 +660,16 @@ export default function FocusDay({supabase,user,onSignOut}){
   },[supabase,user]);
 
   // Quick-add: create task inline
-  const quickAdd=useCallback(async(title,category)=>{
-    const t={id:uid(),title,notes:'',project:'',projectId:null,category,date:selD,recurrence:{type:'none'},createdAt:Date.now()};
+  const quickAdd=useCallback(async(rawTitle,category)=>{
+    const parsed=parseQuickCommands(rawTitle, projects);
+    let title=parsed.title||rawTitle.trim();
+    let projectId=null;
+    if(parsed.projectId)projectId=parsed.projectId;
+    else if(parsed.newProjectName){const np=await createProject(parsed.newProjectName);if(np)projectId=np.id;}
+    const t={id:uid(),title,notes:'',project:JSON.stringify(parsed.tags||[]),projectId,estimate:parsed.estimate||0,category,date:selD,recurrence:{type:'none'},createdAt:Date.now()};
     setTasks(p=>[...p,t]);
-    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',project_id:null,category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
-  },[supabase,user,selD]);
+    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',estimate:t.estimate,project:t.project,project_id:projectId,category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
+  },[supabase,user,selD,projects]);
 
   // Change task category (drag between sections)
   const catChange=useCallback(async(taskId,newCat)=>{
@@ -673,11 +678,16 @@ export default function FocusDay({supabase,user,onSignOut}){
   },[supabase,user]);
 
   // Backlog quick-add (task with date=BL_DATE)
-  const backlogAdd=useCallback(async(title)=>{
-    const t={id:uid(),title,notes:'',project:'',projectId:null,category:'important',date:BL_DATE,recurrence:{type:'none'},createdAt:Date.now()};
+  const backlogAdd=useCallback(async(rawTitle)=>{
+    const parsed=parseQuickCommands(rawTitle, projects);
+    let title=parsed.title||rawTitle.trim();
+    let projectId=null;
+    if(parsed.projectId)projectId=parsed.projectId;
+    else if(parsed.newProjectName){const np=await createProject(parsed.newProjectName);if(np)projectId=np.id;}
+    const t={id:uid(),title,notes:'',project:JSON.stringify(parsed.tags||[]),projectId,estimate:parsed.estimate||0,category:'important',date:BL_DATE,recurrence:{type:'none'},createdAt:Date.now()};
     setTasks(p=>[...p,t]);
-    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',project:'',project_id:null,category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
-  },[supabase,user]);
+    await supabase.from('tasks').insert({id:t.id,user_id:user.id,title:t.title,notes:'',estimate:t.estimate,project:t.project,project_id:projectId,category:t.category,date:t.date,recurrence:t.recurrence,created_at:t.createdAt});
+  },[supabase,user,projects]);
 
   // Dropping a project pill onto a calendar date opens the modal pre-filled
   const [pendingProjectDrop,setPendingProjectDrop]=useState(null);
