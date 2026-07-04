@@ -65,6 +65,12 @@ body::after {
   to { stroke-dashoffset: 0; }
 }
 
+/* Popover entrance */
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.92) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* View transitions */
 @keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -87,6 +93,17 @@ body::after {
 [data-animate] > *:nth-child(5) { animation-delay: 0.08s; }
 [data-animate] > *:nth-child(6) { animation-delay: 0.1s; }
 [data-animate] > *:nth-child(7) { animation-delay: 0.12s; }
+
+/* Refined scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(28,25,23,0.15); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(28,25,23,0.28); background-clip: content-box; }
+html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); background-clip: content-box; }
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); background-clip: content-box; }
+
+/* Selection */
+::selection { background: rgba(59,91,219,0.22); }
 
 /* Dark mode */
 html[data-theme="dark"] {
