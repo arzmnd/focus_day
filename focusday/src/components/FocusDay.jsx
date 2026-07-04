@@ -285,14 +285,14 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
   );
 }
 
-function SettingsModal({isOpen,onClose,settings,onSave,showRec,setShowRec}){
+function SettingsModal({isOpen,onClose,settings,onSave,showRec,setShowRec,allTags,onDeleteTag}){
   const [lim,setLim]=useState(settings.limits);
   const [sc,setSc]=useState(settings.shortcut||'n');
   const [dark,setDark]=useState(settings.dark||false);
   const [ww,setWw]=useState(settings.workWeek||false);
   useEffect(()=>{if(isOpen){setLim(settings.limits);setSc(settings.shortcut||'n');setDark(settings.dark||false);setWw(settings.workWeek||false);}},[isOpen,settings]);
   if(!isOpen)return null;
-  return(<div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}><div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',backdropFilter:'blur(4px)'}}/><div onClick={e=>e.stopPropagation()} style={{position:'relative',background:T.surface,borderRadius:T.rl,width:'min(400px,90vw)',boxShadow:'0 20px 60px rgba(0,0,0,0.15)',fontFamily:F,padding:24}}>
+  return(<div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}><div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',backdropFilter:'blur(4px)'}}/><div onClick={e=>e.stopPropagation()} style={{position:'relative',background:T.surface,borderRadius:T.rl,width:'min(400px,90vw)',maxHeight:'85vh',overflow:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.15)',fontFamily:F,padding:24}}>
     <h3 style={{margin:'0 0 20px',fontSize:18,fontWeight:600,fontFamily:SF,color:T.text}}>Configuración</h3>
     <p style={{fontSize:13,color:T.ts,margin:'0 0 16px'}}>Límite de tareas por categoría.</p>
     {Object.entries(CAT).map(([k,m])=><div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 0',borderBottom:`1px solid ${T.borderLight}`}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:10,height:10,borderRadius:'50%',background:m.color}}/><span style={{fontSize:14,fontWeight:500,color:T.text}}>{m.label}</span></div><input type="number" min={1} max={99} value={lim[k]} onChange={e=>setLim(p=>({...p,[k]:Math.max(1,+e.target.value)}))} style={{width:56,padding:'8px 10px',fontSize:14,fontFamily:F,textAlign:'center',border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none'}}/></div>)}
@@ -312,6 +312,13 @@ function SettingsModal({isOpen,onClose,settings,onSave,showRec,setShowRec}){
       <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Modo oscuro</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Cambiar tema de la interfaz</span></div>
       <Toggle on={dark} onToggle={()=>setDark(p=>!p)}/>
     </div>
+    {allTags&&allTags.length>0&&<div style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${T.borderLight}`}}>
+      <span style={{fontSize:14,fontWeight:500,color:T.text,display:'block',marginBottom:2}}>Banco de tags</span>
+      <span style={{fontSize:12,color:T.tm,display:'block',marginBottom:10}}>Elimina tags que ya no uses</span>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+        {allTags.map(t=>{const c=pColor(t);return<span key={t} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 6px 3px 10px',borderRadius:20,background:c.bg,color:c.text,border:`1px solid ${c.border}`,fontSize:12,fontWeight:500,fontFamily:F}}>{t}<button onClick={()=>{if(confirm(`¿Eliminar el tag "${t}" de todas las tareas?`))onDeleteTag(t);}} style={{background:'none',border:'none',cursor:'pointer',padding:0,display:'flex',alignItems:'center',opacity:0.5,transition:'opacity 0.15s'}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}><Ic name="x" size={11} color={c.text}/></button></span>;})}
+      </div>
+    </div>}
     <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
       <button onClick={onClose} style={{padding:'10px 20px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:13,fontWeight:500,fontFamily:F}}>Cancelar</button>
       <button onClick={()=>{onSave({...settings,limits:lim,shortcut:sc,dark,workWeek:ww});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F}}>Guardar</button>
@@ -553,8 +560,9 @@ function FocusMode({task,onToggle,onExit}){
 
 // ─── Projects Sidebar (right, half-width of left panel) ────────────
 const PROJECT_PALETTE=['#dc2626','#2563eb','#16a34a','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#ea580c','#4f46e5'];
-function ProjectsSidebar({projects,onAdd,onDelete,onDragStart}){
+function ProjectsSidebar({projects,onAdd,onDelete,onDragStart,onColorChange}){
   const [adding,setAdding]=useState(false),[name,setName]=useState('');
+  const [pickerFor,setPickerFor]=useState(null);
   const iRef=useRef(null);
   const nextColor=PROJECT_PALETTE[projects.length%PROJECT_PALETTE.length];
   const doAdd=()=>{if(name.trim()){onAdd(name.trim(),nextColor);setName('');setAdding(false);}};
@@ -572,9 +580,16 @@ function ProjectsSidebar({projects,onAdd,onDelete,onDragStart}){
             onMouseEnter={e=>{e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)';e.currentTarget.style.transform='translateX(-1px)';}}
             onMouseLeave={e=>{e.currentTarget.style.boxShadow='none';e.currentTarget.style.transform='';}}
           >
-            <div style={{width:8,height:8,borderRadius:'50%',background:p.color,flexShrink:0}}/>
+            <button onClick={e=>{e.stopPropagation();setPickerFor(pickerFor===p.id?null:p.id);}} title="Cambiar color" style={{width:8,height:8,borderRadius:'50%',background:p.color,flexShrink:0,border:'none',cursor:'pointer',padding:0}}/>
             <span style={{flex:1,fontSize:12,color:T.text,fontFamily:F,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
             <button onClick={()=>{if(confirm(`¿Finalizar "${p.name}"? Las tareas conservarán su color pero el proyecto se eliminará.`))onDelete(p.id);}} title="Finalizar proyecto" style={{background:'none',border:'none',cursor:'pointer',padding:1,opacity:0.3,transition:'opacity 0.15s',flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.3}><Ic name="x" size={11} color={T.tm}/></button>
+            {pickerFor===p.id&&(
+              <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:'100%',left:0,zIndex:20,marginTop:4,padding:8,background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.rs,boxShadow:'0 8px 24px rgba(0,0,0,0.12)',display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6,width:118}}>
+                {PROJECT_PALETTE.map(c=>(
+                  <button key={c} onClick={()=>{onColorChange(p.id,c);setPickerFor(null);}} style={{width:16,height:16,borderRadius:'50%',background:c,border:c===p.color?`2px solid ${T.text}`:'2px solid transparent',cursor:'pointer',padding:0,transition:'transform 0.12s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.2)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}/>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {adding&&(
@@ -600,6 +615,7 @@ export default function FocusDay({supabase,user,onSignOut}){
   useEffect(()=>{const now=new Date();setToday(now);setSelD(fmt(now));setWS(startOfWeek(now));},[]);
   const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
   const [focusMode,setFocusMode]=useState(false);
+  const [leftCollapsed,setLeftCollapsed]=useState(false);
   const allTags=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.project){try{const a=JSON.parse(t.project);if(Array.isArray(a))a.forEach(x=>s.add(x));else if(t.project)s.add(t.project);}catch{s.add(t.project);}}});return[...s].sort();},[tasks]);
   // When showRec is off, show only the next uncompleted occurrence per recurring task
   const calTasks=useMemo(()=>{
@@ -652,6 +668,23 @@ export default function FocusDay({supabase,user,onSignOut}){
     setTasks(prev=>prev.map(t=>t.projectId===id?{...t,projectId:null}:t));
     await supabase.from('projects').delete().eq('id',id).eq('user_id',user.id);
   },[supabase,user]);
+  const updateProjectColor=useCallback(async(id,color)=>{
+    setProjects(prev=>prev.map(p=>p.id===id?{...p,color}:p));
+    await supabase.from('projects').update({color}).eq('id',id).eq('user_id',user.id);
+  },[supabase,user]);
+
+  // Remove a tag from every task that has it
+  const deleteTag=useCallback(async(tagName)=>{
+    const affected=tasks.filter(t=>{try{const a=JSON.parse(t.project||'[]');return Array.isArray(a)&&a.includes(tagName);}catch{return t.project===tagName;}});
+    setTasks(prev=>prev.map(t=>{
+      if(!affected.find(a=>a.id===t.id))return t;
+      try{const a=JSON.parse(t.project||'[]');const na=Array.isArray(a)?a.filter(x=>x!==tagName):[];return{...t,project:JSON.stringify(na)};}catch{return{...t,project:''};}
+    }));
+    for(const t of affected){
+      try{const a=JSON.parse(t.project||'[]');const na=Array.isArray(a)?a.filter(x=>x!==tagName):[];await supabase.from('tasks').update({project:JSON.stringify(na)}).eq('id',t.id).eq('user_id',user.id);}
+      catch{await supabase.from('tasks').update({project:''}).eq('id',t.id).eq('user_id',user.id);}
+    }
+  },[supabase,user,tasks]);
 
   // Drag-and-drop: move task to a new date
   const moveTask=useCallback(async(taskId,newDate)=>{
@@ -730,18 +763,33 @@ export default function FocusDay({supabase,user,onSignOut}){
       </div>
 
       {/* Split layout: Left = DayView, Center = Calendar, Right = Projects */}
-      <div style={{display:'grid',gridTemplateColumns:'340px 1fr 170px',gap:32,flex:1,minHeight:0}}>
-        {/* LEFT: Day View (always visible) */}
-        <div style={{overflowY:'auto',paddingRight:8}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+      <div style={{display:'grid',gridTemplateColumns:leftCollapsed?'0px 1fr 170px':'340px 1fr 170px',gap:leftCollapsed?16:32,flex:1,minHeight:0,transition:'grid-template-columns 0.3s cubic-bezier(0.4,0,0.2,1), gap 0.3s ease',position:'relative'}}>
+        {/* LEFT: Day View (always visible, collapsible) */}
+        <div style={{overflowY:leftCollapsed?'hidden':'auto',overflowX:'hidden',paddingRight:leftCollapsed?0:8,opacity:leftCollapsed?0:1,transition:'opacity 0.2s ease',pointerEvents:leftCollapsed?'none':'auto',width:leftCollapsed?0:'auto'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,minWidth:300}}>
             <button onClick={()=>setSelD(fmt(addDays(sd,-1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevLeft" size={16}/></button>
             <span style={{fontSize:14,fontWeight:600,fontFamily:F}}>{sd.getDate()} {monthNames[sd.getMonth()]} {sd.getFullYear()}</span>
             <button onClick={()=>setSelD(fmt(addDays(sd,1)))} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="chevRight" size={16}/></button>
           </div>
-          <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} onQuickAdd={quickAdd} onCatChange={catChange} settings={settings} projects={projects}/>
-          {(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return theThing?<button onClick={()=>setFocusMode(true)} style={{marginTop:16,width:'100%',padding:'10px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.thing,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'transform 0.2s',opacity:0.9}} onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.02)';e.currentTarget.style.opacity='1';}} onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.opacity='0.9';}}><Ic name="focus" size={16} color="#fff"/>Focus Mode</button>:null;})()}
-          <Backlog tasks={tasks} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onMoveToDate={moveTask} onQuickAdd={backlogAdd} onDelete={delTask}/>
+          <div style={{minWidth:300}}>
+            <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} onQuickAdd={quickAdd} onCatChange={catChange} settings={settings} projects={projects}/>
+            {(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return theThing?<button onClick={()=>setFocusMode(true)} style={{marginTop:16,width:'100%',padding:'10px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.thing,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'transform 0.2s',opacity:0.9}} onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.02)';e.currentTarget.style.opacity='1';}} onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.opacity='0.9';}}><Ic name="focus" size={16} color="#fff"/>Focus Mode</button>:null;})()}
+            <Backlog tasks={tasks} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onMoveToDate={moveTask} onQuickAdd={backlogAdd} onDelete={delTask}/>
+          </div>
         </div>
+
+        {/* Collapse toggle — floating pill at the panel boundary */}
+        <button onClick={()=>setLeftCollapsed(p=>!p)} title={leftCollapsed?'Mostrar panel del día':'Ocultar panel del día'} style={{
+          position:'absolute',left:leftCollapsed?-4:'calc(340px - 4px)',top:6,zIndex:5,
+          width:20,height:36,borderRadius:10,border:`1px solid ${T.border}`,background:T.surface,
+          display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0,
+          boxShadow:'0 1px 4px rgba(0,0,0,0.06)',transition:'left 0.3s cubic-bezier(0.4,0,0.2,1), background 0.15s',
+        }}
+          onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover}
+          onMouseLeave={e=>e.currentTarget.style.background=T.surface}
+        >
+          <Ic name={leftCollapsed?'chevRight':'chevLeft'} size={12} color={T.tm}/>
+        </button>
 
         {/* CENTER: Calendar panel — scroll to navigate */}
         <div style={{display:'flex',flexDirection:'column',minHeight:0}}
@@ -763,11 +811,11 @@ export default function FocusDay({supabase,user,onSignOut}){
         </div>
 
         {/* RIGHT: Projects sidebar */}
-        <ProjectsSidebar projects={projects} onAdd={(name,color)=>createProject(name,color)} onDelete={deleteProject}/>
+        <ProjectsSidebar projects={projects} onAdd={(name,color)=>createProject(name,color)} onDelete={deleteProject} onColorChange={updateProjectColor}/>
       </div>
 
       <TaskModal isOpen={mOpen} onClose={()=>{setMOpen(false);setETask(null);setPendingProjectDrop(null);}} onSave={saveTask} onDelete={delTask} task={eTask} dateStr={selD} category={aCat} tasks={tasks} completions={comp} settings={settings} allTags={allTags} projects={projects} onCreateProject={createProject} initialProjectId={pendingProjectDrop}/>
-      <SettingsModal isOpen={sOpen} onClose={()=>setSOpen(false)} settings={settings} onSave={saveSets} showRec={showRec} setShowRec={setShowRec}/>
+      <SettingsModal isOpen={sOpen} onClose={()=>setSOpen(false)} settings={settings} onSave={saveSets} showRec={showRec} setShowRec={setShowRec} allTags={allTags} onDeleteTag={deleteTag}/>
       {focusMode&&(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return<FocusMode task={theThing} onToggle={()=>{if(theThing)toggle(theThing);}} onExit={()=>setFocusMode(false)}/>;})()}
     </div>
   );
