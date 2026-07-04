@@ -71,6 +71,7 @@ function Ic({name,size=18,color:C,style:s}){
     target:<><circle cx="12" cy="12" r="10" stroke={C||T.thing} strokeWidth="1.8" fill="none"/><circle cx="12" cy="12" r="6" stroke={C||T.thing} strokeWidth="1.8" fill="none"/><circle cx="12" cy="12" r="2" fill={C||T.thing}/></>,
     star:<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill={C||T.text} stroke="none"/>,
     logout:<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke={C||T.ts} strokeWidth="1.8" fill="none" strokeLinecap="round"/><polyline points="16 17 21 12 16 7" stroke={C||T.ts} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke={C||T.ts} strokeWidth="1.8" strokeLinecap="round"/></>,
+    sidebar:<><rect x="3" y="4" width="18" height="16" rx="3" stroke={C||T.ts} strokeWidth="1.7" fill="none"/><line x1="9.5" y1="4" x2="9.5" y2="20" stroke={C||T.ts} strokeWidth="1.7"/></>,
     note:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round"/><polyline points="14 2 14 8 20 8" stroke={C||T.tm} strokeWidth="1.8" fill="none" strokeLinecap="round"/></>,
     focus:<><circle cx="12" cy="12" r="10" stroke={C||T.thing} strokeWidth="1.8" fill="none"/><polygon points="10 8 16 12 10 16" fill={C||T.thing}/></>,
     pause:<><rect x="6" y="4" width="4" height="16" rx="1" fill={C||T.text}/><rect x="14" y="4" width="4" height="16" rx="1" fill={C||T.text}/></>,
@@ -633,7 +634,6 @@ export default function FocusDay({supabase,user,onSignOut}){
   const [mOpen,setMOpen]=useState(false),[eTask,setETask]=useState(null),[aCat,setACat]=useState(null),[sOpen,setSOpen]=useState(false),[showRec,setShowRec]=useState(true);
   const [focusMode,setFocusMode]=useState(false);
   const [leftCollapsed,setLeftCollapsed]=useState(false);
-  const [toggleHover,setToggleHover]=useState(false);
   const allTags=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.project){try{const a=JSON.parse(t.project);if(Array.isArray(a))a.forEach(x=>s.add(x));else if(t.project)s.add(t.project);}catch{s.add(t.project);}}});return[...s].sort();},[tasks]);
   // When showRec is off, show only the next uncompleted occurrence per recurring task
   const calTasks=useMemo(()=>{
@@ -765,6 +765,16 @@ export default function FocusDay({supabase,user,onSignOut}){
       {/* Header — single condensed line */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
         <div style={{display:'flex',alignItems:'baseline',gap:14}}>
+          <button onClick={()=>setLeftCollapsed(p=>!p)} title={leftCollapsed?'Mostrar panel del día':'Ocultar panel del día'} style={{
+            display:'flex',alignItems:'center',justifyContent:'center',alignSelf:'center',
+            width:30,height:30,borderRadius:T.rs,border:`1px solid ${T.border}`,background:T.surface,
+            cursor:'pointer',padding:0,boxShadow:T.sh1,transition:`all 0.15s ${T.ease}`,
+          }}
+            onMouseEnter={e=>{e.currentTarget.style.background=T.surfaceHover;e.currentTarget.style.boxShadow=T.sh2;}}
+            onMouseLeave={e=>{e.currentTarget.style.background=T.surface;e.currentTarget.style.boxShadow=T.sh1;}}
+          >
+            <Ic name="sidebar" size={15} color={leftCollapsed?T.tm:T.text}/>
+          </button>
           <h1 style={{margin:0,fontSize:23,fontWeight:500,fontFamily:SF,letterSpacing:'-0.015em',color:T.text}}>Focus Day</h1>
           {fn&&<span style={{fontSize:13,color:T.tm,fontWeight:500}}>{getGreeting()}, {fn}</span>}
           {(()=>{const dt=tasksFor(tasks,selD,comp);const tC=dt.filter(t=>t.category==='thing').length;const iC=dt.filter(t=>t.category==='important').length;const mC=dt.filter(t=>t.category==='maintenance').length;return dt.length>0?<div style={{display:'flex',alignItems:'center',gap:6,padding:'3px 10px',borderRadius:20,background:T.accentSoft}}>{tC>0&&<span style={{fontSize:11,color:T.thing,fontWeight:600}}>{tC} Thing</span>}{iC>0&&<span style={{fontSize:11,color:T.imp,fontWeight:600}}>{iC} Imp</span>}{mC>0&&<span style={{fontSize:11,color:T.maint,fontWeight:600}}>{mC} Maint</span>}</div>:null;})()}
@@ -795,29 +805,6 @@ export default function FocusDay({supabase,user,onSignOut}){
           </div>
         </div>
 
-        {/* Collapse toggle — subtle circular handle, vertically centered, discoverable on hover */}
-        <div
-          onMouseEnter={()=>setToggleHover(true)}
-          onMouseLeave={()=>setToggleHover(false)}
-          style={{
-            position:'absolute',left:leftCollapsed?-13:'calc(340px - 13px)',top:0,bottom:0,zIndex:5,
-            width:26,display:'flex',alignItems:'center',justifyContent:'center',
-            transition:`left 0.3s ${T.ease}`,cursor:'pointer',
-          }}
-          onClick={()=>setLeftCollapsed(p=>!p)}
-        >
-          <button title={leftCollapsed?'Mostrar panel del día':'Ocultar panel del día'} tabIndex={-1} style={{
-            width:26,height:26,borderRadius:'50%',border:`1px solid ${T.border}`,
-            background:T.surface,display:'flex',alignItems:'center',justifyContent:'center',
-            cursor:'pointer',padding:0,pointerEvents:'none',
-            boxShadow:toggleHover?T.sh3:T.sh1,
-            opacity:toggleHover?1:0.55,
-            transform:toggleHover?'scale(1.08)':'scale(1)',
-            transition:`opacity 0.2s ${T.ease}, box-shadow 0.2s ${T.ease}, transform 0.2s ${T.ease}, background 0.2s ${T.ease}`,
-          }}>
-            <Ic name={leftCollapsed?'chevRight':'chevLeft'} size={12} color={T.ts}/>
-          </button>
-        </div>
 
         {/* CENTER: Calendar panel — scroll to navigate */}
         <div style={{display:'flex',flexDirection:'column',minHeight:0}}
