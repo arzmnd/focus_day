@@ -39,7 +39,22 @@ function tasksFor(tasks, ds, comp) {
   return tasks.filter(t=>t.date!==BL_DATE&&shouldTaskAppear(t,ds)).map(t=>({...t,completed:!!(comp[`${t.id}::${ds}`])}));
 }
 
-const T={bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thing:'#dc2626',thingBg:'#fef2f2',imp:'#2563eb',impBg:'#eff6ff',maint:'#78716c',maintBg:'#f5f5f4',ok:'#16a34a',okBg:'#f0fdf4',r:'10px',rs:'6px',rl:'14px'};
+const T={
+  bg:'#fafaf9',surface:'#ffffff',surfaceSolid:'#ffffff',surfaceHover:'#f7f6f5',
+  border:'rgba(28,25,23,0.09)',borderLight:'rgba(28,25,23,0.055)',borderMed:'rgba(28,25,23,0.14)',
+  text:'#1c1917',ts:'#6b6560',tm:'#a39e98',accentSoft:'rgba(28,25,23,0.045)',
+  thing:'#e11d48',thingBg:'rgba(225,29,72,0.07)',
+  imp:'#3b5bdb',impBg:'rgba(59,91,219,0.07)',
+  maint:'#71717a',maintBg:'rgba(113,113,122,0.06)',
+  ok:'#16a34a',okBg:'rgba(22,163,74,0.08)',
+  r:'12px',rs:'8px',rl:'18px',
+  sh1:'0 1px 2px rgba(28,25,23,0.05), 0 1px 1px rgba(28,25,23,0.03)',
+  sh2:'0 2px 8px rgba(28,25,23,0.06), 0 1px 3px rgba(28,25,23,0.04)',
+  sh3:'0 8px 24px rgba(28,25,23,0.09), 0 2px 6px rgba(28,25,23,0.05)',
+  sh4:'0 20px 60px rgba(28,25,23,0.16), 0 4px 16px rgba(28,25,23,0.08)',
+  ease:'cubic-bezier(0.4,0,0.2,1)',easeOut:'cubic-bezier(0.16,1,0.3,1)',
+};
+const GLASS={background:'rgba(255,255,255,0.78)',backdropFilter:'blur(24px) saturate(1.5)',WebkitBackdropFilter:'blur(24px) saturate(1.5)'};
 const F="'DM Sans',sans-serif", SF="'Instrument Serif',serif";
 
 function Ic({name,size=18,color:C,style:s}){
@@ -205,28 +220,30 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
     onSave({id:task?.id||uid(),title:finalTitle,notes:notes.trim(),estimate:finalEstimate||0,project:JSON.stringify(finalTags),projectId:finalProjectId,category:c,date,recurrence:rec,createdAt:task?.createdAt||Date.now()});onClose();
   };
   const togD=(d)=>setRecD(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d].sort());
-  const IS={width:'100%',boxSizing:'border-box',padding:'10px 14px',fontSize:14,fontFamily:F,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',transition:'border-color 0.2s'};
-  const LS={fontSize:12,fontWeight:500,color:T.ts,display:'block',marginBottom:6};
+  const IS={width:'100%',boxSizing:'border-box',padding:'10px 14px',fontSize:14,fontFamily:F,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',transition:`border-color 0.15s ${T.ease}, box-shadow 0.15s ${T.ease}`};
+  const LS={fontSize:11.5,fontWeight:600,color:T.ts,display:'block',marginBottom:7,letterSpacing:'0.02em',textTransform:'uppercase'};
+  const focusRing=e=>{e.target.style.borderColor=T.imp;e.target.style.boxShadow=`0 0 0 3px ${T.impBg}`;};
+  const blurRing=e=>{e.target.style.borderColor=T.border;e.target.style.boxShadow='none';};
   const selectedProject=projects.find(p=>p.id===projectId);
   const nthLabels={1:'primer',2:'segundo',3:'tercer',4:'cuarto',[-1]:'último'};
   return(
-    <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}>
-      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',backdropFilter:'blur(4px)'}}/>
-      <div onClick={e=>e.stopPropagation()} style={{position:'relative',background:T.surface,borderRadius:T.rl,width:'min(460px,92vw)',maxHeight:'88vh',overflow:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.15)',fontFamily:F}}>
-        <div style={{padding:'24px 24px 0'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-            <h3 style={{margin:0,fontSize:18,fontWeight:600,color:T.text,fontFamily:SF}}>{task?'Editar tarea':'Nueva tarea'}</h3>
-            <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="x" size={20}/></button>
+    <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={onClose}>
+      <div style={{position:'absolute',inset:0,background:'rgba(20,18,16,0.35)',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)',animation:`fadeIn 0.2s ${T.ease}`}}/>
+      <div onClick={e=>e.stopPropagation()} style={{position:'relative',...GLASS,borderRadius:T.rl,width:'min(460px,92vw)',maxHeight:'88vh',overflow:'auto',boxShadow:T.sh4,border:`1px solid ${T.border}`,fontFamily:F,animation:`popIn 0.22s ${T.easeOut}`}}>
+        <div style={{padding:'26px 26px 0'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:22}}>
+            <h3 style={{margin:0,fontSize:19,fontWeight:500,color:T.text,fontFamily:SF,letterSpacing:'-0.01em'}}>{task?'Editar tarea':'Nueva tarea'}</h3>
+            <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:5,borderRadius:T.rs,transition:`background 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.background=T.accentSoft} onMouseLeave={e=>e.currentTarget.style.background='transparent'}><Ic name="x" size={19}/></button>
           </div>
-          <input ref={iRef} value={title} onChange={e=>setTitle(e.target.value)} placeholder="¿Qué necesitas hacer? Usa #tag @proyecto 30m" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)save();}} style={{...IS,fontSize:15,padding:'12px 14px',borderRadius:T.r}} onFocus={e=>e.target.style.borderColor=T.text} onBlur={e=>e.target.style.borderColor=T.border}/>
-          {preview&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8,alignItems:'center'}}>
-            <span style={{fontSize:10,color:T.tm,fontFamily:F}}>Se detectó:</span>
-            {preview.tags.map(t=><span key={t} style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:T.impBg,color:T.imp,fontFamily:F,fontWeight:500}}>#{t}</span>)}
-            {(preview.projectId||preview.newProjectName)&&<span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:T.thingBg,color:T.thing,fontFamily:F,fontWeight:500}}>@{preview.projectId?projects.find(p=>p.id===preview.projectId)?.name:`${preview.newProjectName} (nuevo)`}</span>}
-            {preview.estimate!=null&&<span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:T.accentSoft,color:T.ts,fontFamily:F,fontWeight:500}}>⏱ {fmtEst(preview.estimate)}</span>}
+          <input ref={iRef} value={title} onChange={e=>setTitle(e.target.value)} placeholder="¿Qué necesitas hacer? Usa #tag @proyecto 30m" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)save();}} style={{...IS,fontSize:15.5,padding:'13px 15px',borderRadius:T.r,fontWeight:450}} onFocus={focusRing} onBlur={blurRing}/>
+          {preview&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:9,alignItems:'center',animation:`fadeSlideIn 0.2s ${T.ease}`}}>
+            <span style={{fontSize:10,color:T.tm,fontFamily:F,fontWeight:500}}>Se detectó:</span>
+            {preview.tags.map(t=><span key={t} style={{fontSize:10,padding:'3px 8px',borderRadius:20,background:T.impBg,color:T.imp,fontFamily:F,fontWeight:600}}>#{t}</span>)}
+            {(preview.projectId||preview.newProjectName)&&<span style={{fontSize:10,padding:'3px 8px',borderRadius:20,background:T.thingBg,color:T.thing,fontFamily:F,fontWeight:600}}>@{preview.projectId?projects.find(p=>p.id===preview.projectId)?.name:`${preview.newProjectName} (nuevo)`}</span>}
+            {preview.estimate!=null&&<span style={{fontSize:10,padding:'3px 8px',borderRadius:20,background:T.accentSoft,color:T.ts,fontFamily:F,fontWeight:600}}>⏱ {fmtEst(preview.estimate)}</span>}
           </div>}
-          <div style={{display:'flex',gap:8,marginTop:16}}>
-            {Object.entries(CAT).map(([k,m])=><button key={k} onClick={()=>setCat(k)} style={{flex:1,padding:'10px 8px',borderRadius:T.rs,cursor:'pointer',border:`1.5px solid ${category===k?m.color:T.border}`,background:category===k?m.bg:'transparent',color:category===k?m.color:T.ts,fontSize:12,fontWeight:600,fontFamily:F,transition:'all 0.2s',letterSpacing:'0.02em',textTransform:'uppercase'}}>{m.label}</button>)}
+          <div style={{display:'flex',gap:8,marginTop:18}}>
+            {Object.entries(CAT).map(([k,m])=><button key={k} onClick={()=>setCat(k)} style={{flex:1,padding:'10px 8px',borderRadius:T.rs,cursor:'pointer',border:`1.5px solid ${category===k?m.color:T.border}`,background:category===k?m.bg:'transparent',color:category===k?m.color:T.ts,fontSize:11.5,fontWeight:700,fontFamily:F,transition:`all 0.15s ${T.ease}`,letterSpacing:'0.03em',textTransform:'uppercase',boxShadow:category===k?`0 0 0 1px ${m.color}22 inset`:'none'}}>{m.label}</button>)}
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:16}}>
             <div>
@@ -273,11 +290,11 @@ function TaskModal({isOpen,onClose,onSave,onDelete,task,dateStr,category:initCat
             {recP==='nth_weekday'&&<div style={{marginTop:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{fontSize:13,color:T.ts}}>Cada</span><select value={nthN} onChange={e=>setNthN(+e.target.value)} style={{...IS,width:'auto',padding:'8px 10px',fontSize:13,appearance:'auto'}}>{[1,2,3,4,-1].map(n=><option key={n} value={n}>{nthLabels[n]}</option>)}</select><select value={nthWeekday} onChange={e=>setNthWeekday(+e.target.value)} style={{...IS,width:'auto',padding:'8px 10px',fontSize:13,appearance:'auto'}}>{dayNamesFull.map((d,i)=><option key={i} value={i}>{d}</option>)}</select><span style={{fontSize:13,color:T.ts}}>de cada mes</span></div>}
           </div>
         </div>
-        <div style={{padding:'20px 24px',display:'flex',gap:10,justifyContent:task?'space-between':'flex-end',marginTop:8}}>
-          {task&&<button onClick={()=>{onDelete(task.id);onClose();}} style={{padding:'10px 16px',borderRadius:T.rs,border:'none',cursor:'pointer',background:'#fef2f2',color:'#ef4444',fontSize:13,fontWeight:600,fontFamily:F,display:'flex',alignItems:'center',gap:6}}><Ic name="trash" size={15}/>Eliminar</button>}
-          <div style={{display:'flex',gap:10}}>
-            <button onClick={onClose} style={{padding:'10px 20px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:13,fontWeight:500,fontFamily:F}}>Cancelar</button>
-            <button onClick={save} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F,opacity:title.trim()?1:0.4}}>Guardar</button>
+        <div style={{padding:'22px 26px 26px',display:'flex',gap:10,justifyContent:task?'space-between':'flex-end',marginTop:6,borderTop:`1px solid ${T.borderLight}`}}>
+          {task&&<button onClick={()=>{onDelete(task.id);onClose();}} style={{padding:'10px 16px',borderRadius:T.rs,border:'none',cursor:'pointer',background:'rgba(225,29,72,0.08)',color:T.thing,fontSize:13,fontWeight:600,fontFamily:F,display:'flex',alignItems:'center',gap:6,transition:`background 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.background='rgba(225,29,72,0.14)'} onMouseLeave={e=>e.currentTarget.style.background='rgba(225,29,72,0.08)'}><Ic name="trash" size={15} color={T.thing}/>Eliminar</button>}
+          <div style={{display:'flex',gap:10,marginLeft:'auto'}}>
+            <button onClick={onClose} style={{padding:'10px 20px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:13,fontWeight:600,fontFamily:F,transition:`background 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.background=T.accentSoft} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>Cancelar</button>
+            <button onClick={save} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:T.bg,fontSize:13,fontWeight:700,fontFamily:F,opacity:title.trim()?1:0.4,boxShadow:title.trim()?T.sh2:'none',transition:`all 0.15s ${T.ease}`}} onMouseEnter={e=>{if(title.trim())e.currentTarget.style.transform='translateY(-1px)';}} onMouseLeave={e=>e.currentTarget.style.transform=''}>Guardar</button>
           </div>
         </div>
       </div>
@@ -292,36 +309,36 @@ function SettingsModal({isOpen,onClose,settings,onSave,showRec,setShowRec,allTag
   const [ww,setWw]=useState(settings.workWeek||false);
   useEffect(()=>{if(isOpen){setLim(settings.limits);setSc(settings.shortcut||'n');setDark(settings.dark||false);setWw(settings.workWeek||false);}},[isOpen,settings]);
   if(!isOpen)return null;
-  return(<div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}><div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',backdropFilter:'blur(4px)'}}/><div onClick={e=>e.stopPropagation()} style={{position:'relative',background:T.surface,borderRadius:T.rl,width:'min(400px,90vw)',maxHeight:'85vh',overflow:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.15)',fontFamily:F,padding:24}}>
-    <h3 style={{margin:'0 0 20px',fontSize:18,fontWeight:600,fontFamily:SF,color:T.text}}>Configuración</h3>
-    <p style={{fontSize:13,color:T.ts,margin:'0 0 16px'}}>Límite de tareas por categoría.</p>
-    {Object.entries(CAT).map(([k,m])=><div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 0',borderBottom:`1px solid ${T.borderLight}`}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:10,height:10,borderRadius:'50%',background:m.color}}/><span style={{fontSize:14,fontWeight:500,color:T.text}}>{m.label}</span></div><input type="number" min={1} max={99} value={lim[k]} onChange={e=>setLim(p=>({...p,[k]:Math.max(1,+e.target.value)}))} style={{width:56,padding:'8px 10px',fontSize:14,fontFamily:F,textAlign:'center',border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none'}}/></div>)}
+  return(<div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={onClose}><div style={{position:'absolute',inset:0,background:'rgba(20,18,16,0.35)',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)',animation:`fadeIn 0.2s ${T.ease}`}}/><div onClick={e=>e.stopPropagation()} style={{position:'relative',...GLASS,borderRadius:T.rl,width:'min(400px,90vw)',maxHeight:'85vh',overflow:'auto',boxShadow:T.sh4,border:`1px solid ${T.border}`,fontFamily:F,padding:26,animation:`popIn 0.22s ${T.easeOut}`}}>
+    <h3 style={{margin:'0 0 20px',fontSize:19,fontWeight:500,fontFamily:SF,color:T.text,letterSpacing:'-0.01em'}}>Configuración</h3>
+    <p style={{fontSize:12.5,color:T.ts,margin:'0 0 14px',fontWeight:500}}>Límite de tareas por categoría.</p>
+    {Object.entries(CAT).map(([k,m])=><div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 0',borderBottom:`1px solid ${T.borderLight}`}}><div style={{display:'flex',alignItems:'center',gap:9}}><div style={{width:9,height:9,borderRadius:'50%',background:m.color,boxShadow:`0 0 0 3px ${m.color}1a`}}/><span style={{fontSize:13.5,fontWeight:500,color:T.text}}>{m.label}</span></div><input type="number" min={1} max={99} value={lim[k]} onChange={e=>setLim(p=>({...p,[k]:Math.max(1,+e.target.value)}))} style={{width:52,padding:'7px 8px',fontSize:13.5,fontFamily:F,textAlign:'center',border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',fontWeight:600}}/></div>)}
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4,borderTop:`1px solid ${T.borderLight}`}}>
-      <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Atajo nueva tarea</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Tecla para abrir el modal</span></div>
-      <input value={sc} onChange={e=>{const v=e.target.value.slice(-1).toLowerCase();if(v&&/^[a-z]$/.test(v))setSc(v);}} onKeyDown={e=>{if(e.key.length===1&&/^[a-z]$/i.test(e.key)){e.preventDefault();setSc(e.key.toLowerCase());}}} style={{width:44,height:44,padding:0,fontSize:18,fontFamily:F,textAlign:'center',fontWeight:700,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',textTransform:'uppercase'}}/>
+      <div><span style={{fontSize:13.5,fontWeight:500,color:T.text}}>Atajo nueva tarea</span><span style={{fontSize:11.5,color:T.tm,display:'block',marginTop:2}}>Tecla para abrir el modal</span></div>
+      <input value={sc} onChange={e=>{const v=e.target.value.slice(-1).toLowerCase();if(v&&/^[a-z]$/.test(v))setSc(v);}} onKeyDown={e=>{if(e.key.length===1&&/^[a-z]$/i.test(e.key)){e.preventDefault();setSc(e.key.toLowerCase());}}} style={{width:42,height:42,padding:0,fontSize:17,fontFamily:F,textAlign:'center',fontWeight:700,border:`1.5px solid ${T.border}`,borderRadius:T.rs,color:T.text,background:T.bg,outline:'none',textTransform:'uppercase'}}/>
     </div>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4}}>
-      <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Recurrencias futuras</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Mostrar todas o solo la próxima</span></div>
+      <div><span style={{fontSize:13.5,fontWeight:500,color:T.text}}>Recurrencias futuras</span><span style={{fontSize:11.5,color:T.tm,display:'block',marginTop:2}}>Mostrar todas o solo la próxima</span></div>
       <Toggle on={showRec} onToggle={()=>setShowRec(p=>!p)} label={showRec?'Todas':'Próxima'}/>
     </div>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4}}>
-      <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Semana laboral</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Mostrar Lun–Vie como default</span></div>
+      <div><span style={{fontSize:13.5,fontWeight:500,color:T.text}}>Semana laboral</span><span style={{fontSize:11.5,color:T.tm,display:'block',marginTop:2}}>Mostrar Lun–Vie como default</span></div>
       <Toggle on={ww} onToggle={()=>setWw(p=>!p)}/>
     </div>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0 0',marginTop:4}}>
-      <div><span style={{fontSize:14,fontWeight:500,color:T.text}}>Modo oscuro</span><span style={{fontSize:12,color:T.tm,display:'block',marginTop:2}}>Cambiar tema de la interfaz</span></div>
+      <div><span style={{fontSize:13.5,fontWeight:500,color:T.text}}>Modo oscuro</span><span style={{fontSize:11.5,color:T.tm,display:'block',marginTop:2}}>Cambiar tema de la interfaz</span></div>
       <Toggle on={dark} onToggle={()=>setDark(p=>!p)}/>
     </div>
     {allTags&&allTags.length>0&&<div style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${T.borderLight}`}}>
-      <span style={{fontSize:14,fontWeight:500,color:T.text,display:'block',marginBottom:2}}>Banco de tags</span>
-      <span style={{fontSize:12,color:T.tm,display:'block',marginBottom:10}}>Elimina tags que ya no uses</span>
+      <span style={{fontSize:13.5,fontWeight:500,color:T.text,display:'block',marginBottom:2}}>Banco de tags</span>
+      <span style={{fontSize:11.5,color:T.tm,display:'block',marginBottom:10}}>Elimina tags que ya no uses</span>
       <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-        {allTags.map(t=>{const c=pColor(t);return<span key={t} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 6px 3px 10px',borderRadius:20,background:c.bg,color:c.text,border:`1px solid ${c.border}`,fontSize:12,fontWeight:500,fontFamily:F}}>{t}<button onClick={()=>{if(confirm(`¿Eliminar el tag "${t}" de todas las tareas?`))onDeleteTag(t);}} style={{background:'none',border:'none',cursor:'pointer',padding:0,display:'flex',alignItems:'center',opacity:0.5,transition:'opacity 0.15s'}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}><Ic name="x" size={11} color={c.text}/></button></span>;})}
+        {allTags.map(t=>{const c=pColor(t);return<span key={t} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 6px 3px 10px',borderRadius:20,background:c.bg,color:c.text,border:`1px solid ${c.border}`,fontSize:12,fontWeight:600,fontFamily:F}}>{t}<button onClick={()=>{if(confirm(`¿Eliminar el tag "${t}" de todas las tareas?`))onDeleteTag(t);}} style={{background:'none',border:'none',cursor:'pointer',padding:0,display:'flex',alignItems:'center',opacity:0.5,transition:`opacity 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}><Ic name="x" size={11} color={c.text}/></button></span>;})}
       </div>
     </div>}
-    <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
-      <button onClick={onClose} style={{padding:'10px 20px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:13,fontWeight:500,fontFamily:F}}>Cancelar</button>
-      <button onClick={()=>{onSave({...settings,limits:lim,shortcut:sc,dark,workWeek:ww});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F}}>Guardar</button>
+    <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:22,paddingTop:18,borderTop:`1px solid ${T.borderLight}`}}>
+      <button onClick={onClose} style={{padding:'10px 20px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.ts,fontSize:13,fontWeight:600,fontFamily:F,transition:`background 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.background=T.accentSoft} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>Cancelar</button>
+      <button onClick={()=>{onSave({...settings,limits:lim,shortcut:sc,dark,workWeek:ww});onClose();}} style={{padding:'10px 24px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.text,color:T.bg,fontSize:13,fontWeight:700,fontFamily:F,boxShadow:T.sh2,transition:`transform 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.transform='translateY(-1px)'} onMouseLeave={e=>e.currentTarget.style.transform=''}>Guardar</button>
     </div>
   </div></div>);
 }
@@ -377,15 +394,15 @@ function CatSection({category,tasks,onToggle,onEdit,onAdd,onQuickAdd,onCatChange
       </div>
       <button onClick={()=>{if(!at){setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}}} disabled={at} title={at?'Límite alcanzado':'Agregar tarea'} style={{background:'none',border:'none',cursor:at?'not-allowed':'pointer',padding:2,opacity:at?0.15:0.5,transition:'opacity 0.2s'}} onMouseEnter={e=>{if(!at)e.target.style.opacity=1}} onMouseLeave={e=>{if(!at)e.target.style.opacity=0.5}}><Ic name="plus" size={16} color={m.color}/></button>
     </div>
-    <div data-animate="" style={{background:isThing?`linear-gradient(135deg,${T.thingBg},${T.surface})`:T.surface,borderRadius:T.r,border:dragOver?`2px dashed ${m.color}`:isThing?`1.5px solid ${T.thing}22`:`1px solid ${T.borderLight}`,minHeight:tasks.length||qaOpen?'auto':56,overflow:'hidden',transition:'border 0.2s',padding:isThing&&tasks.length===0&&!qaOpen?'4px 0':0}}>
-      {tasks.length===0&&!qaOpen&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px 0',gap:6,color:m.color,opacity:0.4,cursor:'pointer'}} onClick={()=>{if(!at){setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}}}>
+    <div data-animate="" style={{background:isThing?`linear-gradient(150deg,${T.thingBg},${T.surface} 60%)`:T.surface,borderRadius:T.r,border:dragOver?`2px dashed ${m.color}`:isThing?`1px solid ${T.thing}26`:`1px solid ${T.borderLight}`,minHeight:tasks.length||qaOpen?'auto':56,overflow:'hidden',transition:`border 0.2s ${T.ease}, box-shadow 0.2s ${T.ease}`,padding:isThing&&tasks.length===0&&!qaOpen?'4px 0':0,boxShadow:isThing?T.sh2:T.sh1}}>
+      {tasks.length===0&&!qaOpen&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px 0',gap:7,color:m.color,opacity:0.42,cursor:'pointer'}} onClick={()=>{if(!at){setQaOpen(true);setTimeout(()=>qaRef.current?.focus(),50);}}}>
         {EMPTY_SVG[category]}
-        <span style={{fontSize:12,fontFamily:F,fontStyle:'italic'}}>{emptyMsg}</span>
+        <span style={{fontSize:12,fontFamily:F,fontStyle:'italic',fontWeight:500}}>{emptyMsg}</span>
       </div>}
       {tasks.map(t=><TaskItem key={t.id+'_'+t.date} task={t} onToggle={()=>onToggle(t)} onEdit={()=>onEdit(t)} projects={projects}/>)}
-      {qaOpen&&<div style={{padding:'8px 12px',display:'flex',gap:8,alignItems:'center'}}>
-        <input ref={qaRef} value={qaVal} onChange={e=>setQaVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doQA();if(e.key==='Escape'){setQaOpen(false);setQaVal('');}}} placeholder="Escribe y Enter..." style={{flex:1,padding:'8px 10px',fontSize:13,fontFamily:F,border:`1.5px solid ${m.color}44`,borderRadius:T.rs,outline:'none',background:'transparent',color:T.text}} onBlur={()=>{if(!qaVal.trim()){setQaOpen(false);setQaVal('');}}}/>
-        <button onClick={doQA} style={{background:m.color,color:'#fff',border:'none',borderRadius:T.rs,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:F,opacity:qaVal.trim()?1:0.4}}>+</button>
+      {qaOpen&&<div style={{padding:'9px 12px',display:'flex',gap:8,alignItems:'center'}}>
+        <input ref={qaRef} value={qaVal} onChange={e=>setQaVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')doQA();if(e.key==='Escape'){setQaOpen(false);setQaVal('');}}} placeholder="Escribe y Enter..." style={{flex:1,padding:'8px 10px',fontSize:13,fontFamily:F,border:`1.5px solid ${m.color}44`,borderRadius:T.rs,outline:'none',background:'transparent',color:T.text,fontWeight:500}} onBlur={()=>{if(!qaVal.trim()){setQaOpen(false);setQaVal('');}}}/>
+        <button onClick={doQA} style={{background:m.color,color:'#fff',border:'none',borderRadius:T.rs,padding:'7px 13px',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:F,opacity:qaVal.trim()?1:0.4,boxShadow:qaVal.trim()?`0 2px 8px ${m.color}44`:'none',transition:`all 0.15s ${T.ease}`}}>+</button>
       </div>}
     </div>
   </div>);
@@ -425,9 +442,9 @@ function SingleWeekView({weekStart,today,selectedDate,onSelectDate,onDoubleClick
       onDragOver={e=>{e.preventDefault();const isProj=e.dataTransfer.types.includes('application/x-project');setDragOver(isProj?ds+'_proj':ds);}}
       onDragLeave={()=>setDragOver(null)}
       onDrop={e=>{e.preventDefault();setDragOver(null);const pid=e.dataTransfer.getData('application/x-project');if(pid){onDropProject&&onDropProject(pid,ds);return;}const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
-      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 6px 20px rgba(0,0,0,0.1)`:'0 6px 20px rgba(0,0,0,0.08)';}}
-      onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)';}}
-      style={{padding:'12px 10px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isProjDrag?`2px dashed ${T.thing}`:dragOver===ds?`2px dashed ${T.imp}`:'none',background:isProjDrag?T.thingBg:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)'}}>
+      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, ${T.sh3}`:T.sh3;}}
+      onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, ${T.sh2}`:isS?`0 0 0 2px ${T.text}, ${T.sh1}`:T.sh1;}}
+      style={{padding:'12px 10px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isProjDrag?`2px dashed ${T.thing}`:dragOver===ds?`2px dashed ${T.imp}`:'none',background:isProjDrag?T.thingBg:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, ${T.sh2}`:isS?`0 0 0 2px ${T.text}, ${T.sh1}`:T.sh1}}>
       {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'10px 10px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:11,fontWeight:600,color:T.tm,letterSpacing:'0.04em'}}>{dayNames[d.getDay()]}</span><div style={{display:'flex',alignItems:'center',gap:4}}>{(()=>{const te=dt.reduce((s,t)=>s+(t.estimate||0),0);return te>0?<span style={{fontSize:9,color:T.tm,fontFamily:F}}>⏱{fmtEst(te)}</span>:null;})()}<span style={{fontSize:18,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div></div>
       <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
@@ -466,9 +483,9 @@ function PanoramaView({weekStart,today,selectedDate,onSelectDate,onDoubleClickDa
       onDragOver={e=>{e.preventDefault();const isProj=e.dataTransfer.types.includes('application/x-project');setDragOver(isProj?ds+'_proj':ds);}}
       onDragLeave={()=>setDragOver(null)}
       onDrop={e=>{e.preventDefault();setDragOver(null);const pid=e.dataTransfer.getData('application/x-project');if(pid){onDropProject&&onDropProject(pid,ds);return;}const tid=e.dataTransfer.getData('text/plain');if(tid)onMoveTask(tid,ds);}}
-      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 6px 20px rgba(0,0,0,0.1)`:'0 6px 20px rgba(0,0,0,0.08)';}}
-      onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)';}}
-      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isProjDrag?`2px dashed ${T.thing}`:dragOver===ds?`2px dashed ${T.imp}`:'none',background:isProjDrag?T.thingBg:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:isExp?'visible':'hidden',minWidth:0,minHeight:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, 0 0 12px rgba(28,25,23,0.08)`:isS?`0 0 0 2px ${T.text}`:'0 1px 4px rgba(0,0,0,0.04)',zIndex:isExp?10:0}}>
+      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, ${T.sh3}`:T.sh3;}}
+      onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=isT?`0 0 0 2px ${T.text}, ${T.sh2}`:isS?`0 0 0 2px ${T.text}, ${T.sh1}`:T.sh1;}}
+      style={{padding:'10px 8px',borderRadius:T.r,cursor:'pointer',textAlign:'left',border:isProjDrag?`2px dashed ${T.thing}`:dragOver===ds?`2px dashed ${T.imp}`:'none',background:isProjDrag?T.thingBg:dragOver===ds?T.impBg:isS?T.accentSoft:T.surface,fontFamily:F,transition:'all 0.2s',display:'flex',flexDirection:'column',overflow:isExp?'visible':'hidden',minWidth:0,minHeight:0,position:'relative',boxShadow:isT?`0 0 0 2px ${T.text}, ${T.sh2}`:isS?`0 0 0 2px ${T.text}, ${T.sh1}`:T.sh1,zIndex:isExp?10:0}}>
       {dt.length>0&&<div style={{position:'absolute',top:0,left:0,right:0,height:3,background:T.borderLight,borderRadius:'6px 6px 0 0',overflow:'hidden'}}><div style={{height:'100%',width:`${load*100}%`,background:loadCol,borderRadius:3,transition:'width 0.3s ease'}}/></div>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><span style={{fontSize:10,color:T.tm}}>{monthNames[d.getMonth()].slice(0,3)}</span><div style={{display:'flex',alignItems:'center',gap:3}}>{(()=>{const te=dt.reduce((s,t)=>s+(t.estimate||0),0);return te>0?<span style={{fontSize:8,color:T.tm,fontFamily:F}}>⏱{fmtEst(te)}</span>:null;})()}<span style={{fontSize:15,fontWeight:isT?700:400,color:isT?T.text:T.ts}}>{d.getDate()}</span></div></div>
       <div style={{flex:isExp?'none':1,display:'flex',flexDirection:'column',gap:2,minWidth:0,overflow:'hidden'}}>
@@ -576,17 +593,17 @@ function ProjectsSidebar({projects,onAdd,onDelete,onDragStart,onColorChange}){
         {projects.length===0&&!adding&&<p style={{fontSize:11,color:T.tm,fontStyle:'italic',fontFamily:F,opacity:0.6,lineHeight:1.5}}>Sin proyectos activos. Agrega uno o usa @nombre al crear una tarea.</p>}
         {projects.map(p=>(
           <div key={p.id} draggable onDragStart={e=>{e.dataTransfer.setData('application/x-project',p.id);onDragStart&&onDragStart(p.id);}}
-            style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:T.rs,background:T.surface,border:`1px solid ${T.borderLight}`,cursor:'grab',transition:'all 0.15s',position:'relative'}}
-            onMouseEnter={e=>{e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)';e.currentTarget.style.transform='translateX(-1px)';}}
-            onMouseLeave={e=>{e.currentTarget.style.boxShadow='none';e.currentTarget.style.transform='';}}
+            style={{display:'flex',alignItems:'center',gap:9,padding:'9px 11px',borderRadius:T.rs,background:T.surface,border:`1px solid ${T.borderLight}`,cursor:'grab',transition:`box-shadow 0.2s ${T.ease}, transform 0.2s ${T.ease}`,position:'relative',zIndex:pickerFor===p.id?30:'auto',boxShadow:T.sh1}}
+            onMouseEnter={e=>{e.currentTarget.style.boxShadow=T.sh2;e.currentTarget.style.transform='translateY(-1px)';}}
+            onMouseLeave={e=>{e.currentTarget.style.boxShadow=T.sh1;e.currentTarget.style.transform='';}}
           >
-            <button onClick={e=>{e.stopPropagation();setPickerFor(pickerFor===p.id?null:p.id);}} title="Cambiar color" style={{width:8,height:8,borderRadius:'50%',background:p.color,flexShrink:0,border:'none',cursor:'pointer',padding:0}}/>
-            <span style={{flex:1,fontSize:12,color:T.text,fontFamily:F,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
-            <button onClick={()=>{if(confirm(`¿Finalizar "${p.name}"? Las tareas conservarán su color pero el proyecto se eliminará.`))onDelete(p.id);}} title="Finalizar proyecto" style={{background:'none',border:'none',cursor:'pointer',padding:1,opacity:0.3,transition:'opacity 0.15s',flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.3}><Ic name="x" size={11} color={T.tm}/></button>
+            <button onClick={e=>{e.stopPropagation();setPickerFor(pickerFor===p.id?null:p.id);}} title="Cambiar color" style={{width:9,height:9,borderRadius:'50%',background:p.color,flexShrink:0,border:'none',cursor:'pointer',padding:0,boxShadow:`0 0 0 3px ${p.color}22`,transition:`box-shadow 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 0 0 4px ${p.color}33`} onMouseLeave={e=>e.currentTarget.style.boxShadow=`0 0 0 3px ${p.color}22`}/>
+            <span style={{flex:1,fontSize:12.5,color:T.text,fontFamily:F,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontWeight:500}}>{p.name}</span>
+            <button onClick={()=>{if(confirm(`¿Finalizar "${p.name}"? Las tareas conservarán su color pero el proyecto se eliminará.`))onDelete(p.id);}} title="Finalizar proyecto" style={{background:'none',border:'none',cursor:'pointer',padding:1,opacity:0.28,transition:`opacity 0.15s ${T.ease}`,flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.28}><Ic name="x" size={11} color={T.tm}/></button>
             {pickerFor===p.id&&(
-              <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:'100%',left:0,zIndex:20,marginTop:4,padding:8,background:T.surface,border:`1px solid ${T.border}`,borderRadius:T.rs,boxShadow:'0 8px 24px rgba(0,0,0,0.12)',display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6,width:118}}>
+              <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:'calc(100% + 6px)',left:0,zIndex:40,padding:10,...GLASS,border:`1px solid ${T.border}`,borderRadius:T.r,boxShadow:T.sh4,display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:7,width:126,animation:`popIn 0.16s ${T.easeOut}`}}>
                 {PROJECT_PALETTE.map(c=>(
-                  <button key={c} onClick={()=>{onColorChange(p.id,c);setPickerFor(null);}} style={{width:16,height:16,borderRadius:'50%',background:c,border:c===p.color?`2px solid ${T.text}`:'2px solid transparent',cursor:'pointer',padding:0,transition:'transform 0.12s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.2)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}/>
+                  <button key={c} onClick={()=>{onColorChange(p.id,c);setPickerFor(null);}} style={{width:17,height:17,borderRadius:'50%',background:c,border:c===p.color?`2px solid ${T.text}`:'2px solid transparent',boxShadow:c===p.color?`0 0 0 2px ${T.surfaceSolid}`:'none',cursor:'pointer',padding:0,transition:`transform 0.12s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.25)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}/>
                 ))}
               </div>
             )}
@@ -737,27 +754,26 @@ export default function FocusDay({supabase,user,onSignOut}){
   if(!loaded)return<div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F,color:T.tm}}><div style={{textAlign:'center'}}><div style={{fontSize:28,fontFamily:SF,color:T.text,marginBottom:8}}>Focus Day</div><div style={{fontSize:13}}>Cargando tus tareas...</div></div></div>;
 
   // Dynamic theme
-  if(settings.dark){Object.assign(T,{bg:'#1a1a1a',surface:'#242424',surfaceHover:'#2e2e2e',border:'#3a3a3a',borderLight:'#333',text:'#e7e5e4',ts:'#a8a29e',tm:'#78716c',accentSoft:'#2a2a2a',thingBg:'#2c1a1a',impBg:'#1a2638',maintBg:'#242424',okBg:'#1a2a1f'});}
-  else{Object.assign(T,{bg:'#fafaf9',surface:'#fff',surfaceHover:'#f5f5f4',border:'#e7e5e4',borderLight:'#f0eeec',text:'#1c1917',ts:'#78716c',tm:'#a8a29e',accentSoft:'#f5f5f4',thingBg:'#fef2f2',impBg:'#eff6ff',maintBg:'#f5f5f4',okBg:'#f0fdf4'});}
+  if(settings.dark){Object.assign(T,{bg:'#18181a',surface:'#242426',surfaceSolid:'#242426',surfaceHover:'#2c2c2f',border:'rgba(255,255,255,0.08)',borderLight:'rgba(255,255,255,0.05)',borderMed:'rgba(255,255,255,0.14)',text:'#f0efed',ts:'#a8a29e',tm:'#75716d',accentSoft:'rgba(255,255,255,0.06)',thingBg:'rgba(225,29,72,0.14)',impBg:'rgba(59,91,219,0.16)',maintBg:'rgba(255,255,255,0.05)',okBg:'rgba(22,163,74,0.14)',sh1:'0 1px 2px rgba(0,0,0,0.3)',sh2:'0 2px 10px rgba(0,0,0,0.35)',sh3:'0 10px 30px rgba(0,0,0,0.45)',sh4:'0 24px 70px rgba(0,0,0,0.6)'});}
+  else{Object.assign(T,{bg:'#fafaf9',surface:'#ffffff',surfaceSolid:'#ffffff',surfaceHover:'#f7f6f5',border:'rgba(28,25,23,0.09)',borderLight:'rgba(28,25,23,0.055)',borderMed:'rgba(28,25,23,0.14)',text:'#1c1917',ts:'#6b6560',tm:'#a39e98',accentSoft:'rgba(28,25,23,0.045)',thingBg:'rgba(225,29,72,0.07)',impBg:'rgba(59,91,219,0.07)',maintBg:'rgba(113,113,122,0.06)',okBg:'rgba(22,163,74,0.08)',sh1:'0 1px 2px rgba(28,25,23,0.05), 0 1px 1px rgba(28,25,23,0.03)',sh2:'0 2px 8px rgba(28,25,23,0.06), 0 1px 3px rgba(28,25,23,0.04)',sh3:'0 8px 24px rgba(28,25,23,0.09), 0 2px 6px rgba(28,25,23,0.05)',sh4:'0 20px 60px rgba(28,25,23,0.16), 0 4px 16px rgba(28,25,23,0.08)'});}
 
   // Onboarding gate
   if(!settings.onboarded)return<Onboarding userName={fn} onDone={()=>{const ns={...settings,onboarded:true};saveSets(ns);}}/>;
   return(
     <div style={{height:'100vh',background:'transparent',fontFamily:F,color:T.text,padding:'20px 32px 24px',display:'flex',flexDirection:'column',overflow:'hidden',position:'relative',zIndex:1}}>
       {/* Header — single condensed line */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-        <div style={{display:'flex',alignItems:'center',gap:16}}>
-          <h1 style={{margin:0,fontSize:22,fontWeight:400,fontFamily:SF,letterSpacing:'-0.01em'}}>Focus Day</h1>
-          {fn&&<span style={{fontSize:12,color:T.tm}}>|</span>}
-          {fn&&<span style={{fontSize:13,color:T.tm}}>{getGreeting()}, {fn}</span>}
-          {(()=>{const dt=tasksFor(tasks,selD,comp);const tC=dt.filter(t=>t.category==='thing').length;const iC=dt.filter(t=>t.category==='important').length;const mC=dt.filter(t=>t.category==='maintenance').length;return dt.length>0?<><span style={{fontSize:12,color:T.tm}}>·</span><span style={{fontSize:12,color:T.tm}}>{tC>0?`${tC} Thing`:''}{tC>0&&iC>0?' · ':''}{iC>0?`${iC} Imp`:''}{(tC>0||iC>0)&&mC>0?' · ':''}{mC>0?`${mC} Maint`:''}</span></>:null;})()}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:14}}>
+          <h1 style={{margin:0,fontSize:23,fontWeight:500,fontFamily:SF,letterSpacing:'-0.015em',color:T.text}}>Focus Day</h1>
+          {fn&&<span style={{fontSize:13,color:T.tm,fontWeight:500}}>{getGreeting()}, {fn}</span>}
+          {(()=>{const dt=tasksFor(tasks,selD,comp);const tC=dt.filter(t=>t.category==='thing').length;const iC=dt.filter(t=>t.category==='important').length;const mC=dt.filter(t=>t.category==='maintenance').length;return dt.length>0?<div style={{display:'flex',alignItems:'center',gap:6,padding:'3px 10px',borderRadius:20,background:T.accentSoft}}>{tC>0&&<span style={{fontSize:11,color:T.thing,fontWeight:600}}>{tC} Thing</span>}{iC>0&&<span style={{fontSize:11,color:T.imp,fontWeight:600}}>{iC} Imp</span>}{mC>0&&<span style={{fontSize:11,color:T.maint,fontWeight:600}}>{mC} Maint</span>}</div>:null;})()}
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <button onClick={()=>{setSelD(fmt(today));setWS(startOfWeek(today));}} style={{padding:'6px 12px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:'transparent',color:T.text,fontSize:11,fontWeight:600,fontFamily:F}}>Hoy</button>
-          <button onClick={()=>setSOpen(true)} style={{background:'none',border:'none',cursor:'pointer',padding:4}}><Ic name="settings" size={16} color={T.ts}/></button>
-          <div style={{display:'flex',alignItems:'center',gap:5,marginLeft:2}}>
-            {av?<img src={av} alt="" style={{width:26,height:26,borderRadius:'50%',border:`1.5px solid ${T.border}`}} referrerPolicy="no-referrer"/>:<div style={{width:26,height:26,borderRadius:'50%',background:T.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,color:T.ts}}>{un.charAt(0).toUpperCase()}</div>}
-            <button onClick={onSignOut} title="Cerrar sesión" style={{background:'none',border:'none',cursor:'pointer',padding:3}}><Ic name="logout" size={14} color={T.tm}/></button>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={()=>{setSelD(fmt(today));setWS(startOfWeek(today));}} style={{padding:'7px 14px',borderRadius:T.rs,border:`1.5px solid ${T.border}`,cursor:'pointer',background:T.surface,color:T.text,fontSize:11.5,fontWeight:700,fontFamily:F,boxShadow:T.sh1,transition:`all 0.15s ${T.ease}`}} onMouseEnter={e=>{e.currentTarget.style.boxShadow=T.sh2;e.currentTarget.style.transform='translateY(-1px)';}} onMouseLeave={e=>{e.currentTarget.style.boxShadow=T.sh1;e.currentTarget.style.transform='';}}>Hoy</button>
+          <button onClick={()=>setSOpen(true)} style={{background:'none',border:'none',cursor:'pointer',padding:6,borderRadius:T.rs,transition:`background 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.background=T.accentSoft} onMouseLeave={e=>e.currentTarget.style.background='transparent'}><Ic name="settings" size={16} color={T.ts}/></button>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:2,paddingLeft:10,borderLeft:`1px solid ${T.borderLight}`}}>
+            {av?<img src={av} alt="" style={{width:27,height:27,borderRadius:'50%',border:`1.5px solid ${T.border}`,boxShadow:T.sh1}} referrerPolicy="no-referrer"/>:<div style={{width:27,height:27,borderRadius:'50%',background:T.accentSoft,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:T.ts}}>{un.charAt(0).toUpperCase()}</div>}
+            <button onClick={onSignOut} title="Cerrar sesión" style={{background:'none',border:'none',cursor:'pointer',padding:4,borderRadius:T.rs,transition:`background 0.15s ${T.ease}`}} onMouseEnter={e=>e.currentTarget.style.background=T.accentSoft} onMouseLeave={e=>e.currentTarget.style.background='transparent'}><Ic name="logout" size={14} color={T.tm}/></button>
           </div>
         </div>
       </div>
@@ -773,7 +789,7 @@ export default function FocusDay({supabase,user,onSignOut}){
           </div>
           <div style={{minWidth:300}}>
             <DayView dateStr={selD} tasks={tasks} completions={comp} onToggle={toggle} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onAdd={c=>{setETask(null);setACat(c);setMOpen(true);}} onQuickAdd={quickAdd} onCatChange={catChange} settings={settings} projects={projects}/>
-            {(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return theThing?<button onClick={()=>setFocusMode(true)} style={{marginTop:16,width:'100%',padding:'10px',borderRadius:T.rs,border:'none',cursor:'pointer',background:T.thing,color:'#fff',fontSize:13,fontWeight:600,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'transform 0.2s',opacity:0.9}} onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.02)';e.currentTarget.style.opacity='1';}} onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.opacity='0.9';}}><Ic name="focus" size={16} color="#fff"/>Focus Mode</button>:null;})()}
+            {(()=>{const theThing=tasksFor(tasks,selD,comp).find(t=>t.category==='thing');return theThing?<button onClick={()=>setFocusMode(true)} style={{marginTop:16,width:'100%',padding:'11px',borderRadius:T.rs,border:'none',cursor:'pointer',background:`linear-gradient(135deg,${T.thing},#c01858)`,color:'#fff',fontSize:13,fontWeight:700,fontFamily:F,display:'flex',alignItems:'center',justifyContent:'center',gap:7,transition:`all 0.2s ${T.ease}`,boxShadow:`0 4px 14px ${T.thing}3d`,letterSpacing:'0.01em'}} onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 6px 20px ${T.thing}55`;}} onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=`0 4px 14px ${T.thing}3d`;}}><Ic name="focus" size={16} color="#fff"/>Focus Mode</button>:null;})()}
             <Backlog tasks={tasks} onEdit={t=>{setETask(t);setACat(null);setMOpen(true);}} onMoveToDate={moveTask} onQuickAdd={backlogAdd} onDelete={delTask}/>
           </div>
         </div>
@@ -783,10 +799,10 @@ export default function FocusDay({supabase,user,onSignOut}){
           position:'absolute',left:leftCollapsed?-4:'calc(340px - 4px)',top:6,zIndex:5,
           width:20,height:36,borderRadius:10,border:`1px solid ${T.border}`,background:T.surface,
           display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0,
-          boxShadow:'0 1px 4px rgba(0,0,0,0.06)',transition:'left 0.3s cubic-bezier(0.4,0,0.2,1), background 0.15s',
+          boxShadow:T.sh2,transition:`left 0.3s ${T.ease}, background 0.15s ${T.ease}, box-shadow 0.15s ${T.ease}`,
         }}
-          onMouseEnter={e=>e.currentTarget.style.background=T.surfaceHover}
-          onMouseLeave={e=>e.currentTarget.style.background=T.surface}
+          onMouseEnter={e=>{e.currentTarget.style.background=T.surfaceHover;e.currentTarget.style.boxShadow=T.sh3;}}
+          onMouseLeave={e=>{e.currentTarget.style.background=T.surface;e.currentTarget.style.boxShadow=T.sh2;}}
         >
           <Ic name={leftCollapsed?'chevRight':'chevLeft'} size={12} color={T.tm}/>
         </button>
@@ -802,7 +818,7 @@ export default function FocusDay({supabase,user,onSignOut}){
             </span>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <div style={{display:'flex',background:T.surface,borderRadius:T.rs,border:`1px solid ${T.border}`,overflow:'hidden'}}>
-                {[{k:'week',l:'Semana'},{k:'panorama',l:'Panorama'}].map(v=><button key={v.k} onClick={()=>setRightView(v.k)} style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v.k?600:400,background:rightView===v.k?T.text:'transparent',color:rightView===v.k?'#fff':T.ts,fontFamily:F,transition:'all 0.2s'}}>{v.l}</button>)}
+                {[{k:'week',l:'Semana'},{k:'panorama',l:'Panorama'}].map(v=><button key={v.k} onClick={()=>setRightView(v.k)} style={{padding:'7px 15px',border:'none',cursor:'pointer',fontSize:12,fontWeight:rightView===v.k?700:500,background:rightView===v.k?T.text:'transparent',color:rightView===v.k?T.bg:T.ts,fontFamily:F,transition:`all 0.2s ${T.ease}`,boxShadow:rightView===v.k?T.sh1:'none'}}>{v.l}</button>)}
               </div>
             </div>
           </div>
